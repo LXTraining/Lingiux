@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Lingiux Contador de Palabras'),
+      home: const MyHomePage(title: 'Lingiux Contador de Palabras 01'),
     );
   }
 }
