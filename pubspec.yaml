@@ -44,6 +44,13 @@ dev_dependencies:
   injectable_generator: ^2.7.0
   build_runner: ^2.4.13
   mocktail: ^1.0.4
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.jpg"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
