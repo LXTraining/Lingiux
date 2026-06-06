@@ -197,6 +197,11 @@ class _WordCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Container(
         decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: gradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
@@ -206,194 +211,215 @@ class _WordCard extends StatelessWidget {
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Stack(
-            children: [
-              // 1. Imagen representativa de fondo cargada desde Supabase
-              Positioned.fill(
-                child: CachedNetworkImage(
-                  imageUrl: wordCard.imageUrl,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: AppColors.surfaceVariant,
-                    child: const Center(
-                      child: SizedBox(
-                        width: 30,
-                        height: 30,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.primary,
+        child: Stack(
+          children: [
+            // Círculos de diseño abstractos y sutiles en el fondo
+            Positioned(
+              right: -40,
+              top: -40,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Positioned(
+              left: -30,
+              bottom: -30,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+
+            // Contenido principal de la tarjeta
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Fila superior: etiqueta de categoría e icono de audio
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'VOCABULARY',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.8,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  errorWidget: (context, url, err) => Container(
-                    color: AppColors.surfaceVariant,
-                    child: const Icon(
-                      Icons.image_not_supported_outlined,
-                      color: AppColors.onSurfaceMuted,
-                      size: 40,
-                    ),
-                  ),
-                ),
-              ),
-
-              // 2. Capa de degradado semi-transparente para legibilidad de textos
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        gradient[0].withOpacity(0.80),
-                        gradient[1].withOpacity(0.92),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                ),
-              ),
-
-              // 3. Círculos de diseño abstractos y sutiles
-              Positioned(
-                right: -40,
-                top: -40,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: -30,
-                bottom: -30,
-                child: Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-
-              // 4. Información de la palabra
-              Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 5,
-                          ),
+                      GestureDetector(
+                        onTap: () {},
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white.withOpacity(0.15),
+                            shape: BoxShape.circle,
                           ),
-                          child: const Text(
-                            'VOCABULARY',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.8,
-                            ),
+                          child: const Icon(
+                            Icons.volume_up_rounded,
+                            color: Colors.white,
+                            size: 18,
                           ),
                         ),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              shape: BoxShape.circle,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 1. Palabra clave (Centrada arriba)
+                  Text(
+                    wordCard.word,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+
+                  // Fonética (Centrada debajo de la palabra)
+                  Text(
+                    wordCard.phonetic,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 2. Imagen representativa rectangular (Centrada)
+                  Center(
+                    child: Container(
+                      height: 135,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: CachedNetworkImage(
+                          imageUrl: wordCard.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: Colors.white.withOpacity(0.1),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
+                          ),
+                          errorWidget: (context, url, err) => Container(
+                            color: Colors.white.withOpacity(0.1),
                             child: const Icon(
-                              Icons.volume_up_rounded,
-                              color: Colors.white,
-                              size: 20,
+                              Icons.image_not_supported_outlined,
+                              color: Colors.white70,
+                              size: 32,
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Text(
-                      wordCard.word,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 46,
-                        fontWeight: FontWeight.bold,
-                        height: 1.05,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      wordCard.phonetic,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.65),
-                        fontSize: 16,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      height: 1,
-                      color: Colors.white.withOpacity(0.18),
-                    ),
-                    const SizedBox(height: 20),
-                    const Row(
-                      children: [
-                        _Tag(label: 'adjective'),
-                        SizedBox(width: 8),
-                        _Tag(label: 'B2 level'),
-                        SizedBox(width: 8),
-                        _Tag(label: 'English'),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      wordCard.definition,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.88),
-                        fontSize: 15,
-                        height: 1.65,
-                      ),
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _CardAction(
-                            icon: Icons.bookmark_border_rounded,
-                            label: 'Save',
-                            onTap: () {},
-                          ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Separador
+                  Container(
+                    height: 1,
+                    color: Colors.white.withOpacity(0.18),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 3. Tags (Centrados)
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _Tag(label: 'adjective'),
+                      SizedBox(width: 8),
+                      _Tag(label: 'B2 level'),
+                      SizedBox(width: 8),
+                      _Tag(label: 'English'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Definición (Centrada y Scrollable si es necesario)
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Text(
+                        wordCard.definition,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 14,
+                          height: 1.5,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _CardAction(
-                            icon: Icons.quiz_outlined,
-                            label: 'Practice',
-                            onTap: () {},
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Botones de acción en la parte inferior
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _CardAction(
+                          icon: Icons.bookmark_border_rounded,
+                          label: 'Save',
+                          onTap: () {},
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _CardAction(
+                          icon: Icons.quiz_outlined,
+                          label: 'Practice',
+                          onTap: () {},
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
