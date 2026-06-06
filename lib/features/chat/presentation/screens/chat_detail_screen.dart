@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../widgets/message_bubble.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
+import '../../../vocabulary/domain/models/word_card_model.dart';
+import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -316,14 +320,16 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _WordMiniCard extends StatelessWidget {
+class _WordMiniCard extends ConsumerWidget {
   final String word;
   final VoidCallback onTap;
 
   const _WordMiniCard({required this.word, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wordCardsAsync = ref.watch(wordCardsProvider);
+
     return GestureDetector(
       onTap: onTap,
       child: Material(
@@ -348,6 +354,44 @@ class _WordMiniCard extends StatelessWidget {
           ),
           child: Stack(
             children: [
+              // 1. Imagen de fondo representativa si existe en la base de datos
+              ...wordCardsAsync.when(
+                data: (wordList) {
+                  WordCardModel? matchingCard;
+                  for (final w in wordList) {
+                    if (w.word.toLowerCase() == word.toLowerCase()) {
+                      matchingCard = w;
+                      break;
+                    }
+                  }
+
+                  if (matchingCard != null) {
+                    return [
+                      Positioned.fill(
+                        child: Opacity(
+                          opacity: 0.70, // Un poco de transparencia para mezclar con el degradado
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: CachedNetworkImage(
+                              imageUrl: matchingCard.imageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                              errorWidget: (context, url, error) => const SizedBox(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ];
+                  }
+                  return [];
+                },
+                loading: () => [],
+                error: (_, __) => [],
+              ),
+
+              // 2. Círculo decorativo
               Positioned(
                 right: -14,
                 top: -14,
@@ -360,47 +404,73 @@ class _WordMiniCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.auto_stories_outlined,
-                      color: Colors.white60,
-                      size: 22,
+
+              // 3. Contenido de textos y botón de acción con degradado oscuro para legibilidad
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withOpacity(0.1),
+                        Colors.black.withOpacity(0.40),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      word,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.auto_stories_outlined,
                         color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        height: 1.2,
+                        size: 22,
                       ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        'Open',
-                        style: TextStyle(
+                      const SizedBox(height: 8),
+                      Text(
+                        word,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black45,
+                              blurRadius: 4,
+                              offset: Offset(0, 1),
+                            )
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.15),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: const Text(
+                          'Open',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
