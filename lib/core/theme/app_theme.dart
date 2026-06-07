@@ -7,8 +7,8 @@ class AppTheme {
   static ThemeData get theme {
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: const ColorScheme.dark(
+      brightness: Brightness.light,
+      colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.accent,
         surface: AppColors.surface,
@@ -18,55 +18,34 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: AppColors.background,
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        centerTitle: false,
         titleTextStyle: TextStyle(
           color: AppColors.onSurface,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Inter',
         ),
-        iconTheme: IconThemeData(color: AppColors.onSurface),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.surface,
-        indicatorColor: const Color(0x337C3AED),
-        elevation: 0,
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-              color: AppColors.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            );
-          }
-          return const TextStyle(
-            color: AppColors.onSurfaceMuted,
-            fontSize: 12,
-          );
-        }),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: AppColors.primary);
-          }
-          return const IconThemeData(color: AppColors.onSurfaceMuted);
-        }),
+        iconTheme: IconThemeData(color: AppColors.onSurface, size: 24),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceVariant,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        hintStyle: const TextStyle(color: AppColors.onSurfaceMuted),
+        hintStyle: const TextStyle(color: AppColors.onSurfaceMuted, fontSize: 15),
       ),
       dividerTheme: const DividerThemeData(
-        color: AppColors.surfaceVariant,
+        color: AppColors.border,
         thickness: 1,
       ),
     );

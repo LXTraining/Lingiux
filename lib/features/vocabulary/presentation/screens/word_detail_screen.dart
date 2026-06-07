@@ -35,9 +35,10 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final wordCardsAsync = ref.watch(wordCardsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.darkBackground,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -62,7 +63,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               const SizedBox(height: 16),
               Text(
                 'Error al cargar tarjetas:\n$err',
-                style: const TextStyle(color: AppColors.onSurface, fontSize: 14),
+                style: const TextStyle(color: AppColors.darkOnSurface, fontSize: 14),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -82,7 +83,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
             return const Center(
               child: Text(
                 'No hay tarjetas disponibles.',
-                style: TextStyle(color: AppColors.onSurfaceMuted),
+                style: TextStyle(color: AppColors.darkOnSurfaceMuted),
               ),
             );
           }
@@ -123,25 +124,25 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                   children: [
                     const Icon(
                       Icons.swipe_vertical_rounded,
-                      color: AppColors.onSurfaceMuted,
+                      color: AppColors.darkOnSurfaceMuted,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     const Text(
                       'Desliza verticalmente para explorar',
-                      style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 13),
+                      style: TextStyle(color: AppColors.darkOnSurfaceMuted, fontSize: 13),
                     ),
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
+                        color: AppColors.darkSurfaceVariant,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         '${(_currentPage % sortedWords.length) + 1} / ${sortedWords.length}',
                         style: const TextStyle(
-                          color: AppColors.onSurfaceMuted,
+                          color: AppColors.darkOnSurfaceMuted,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -532,7 +533,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
             child: Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
+                color: AppColors.darkSurfaceVariant,
                 borderRadius: BorderRadius.circular(28),
               ),
               child: Column(
@@ -544,7 +545,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                         width: 120,
                         height: 24,
                         decoration: BoxDecoration(
-                          color: AppColors.onSurface.withOpacity(0.1),
+                          color: AppColors.darkOnSurface.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
@@ -553,7 +554,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: AppColors.onSurface.withOpacity(0.1),
+                          color: AppColors.darkOnSurface.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -564,7 +565,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                     width: 220,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppColors.onSurface.withOpacity(0.1),
+                      color: AppColors.darkOnSurface.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
@@ -573,14 +574,14 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                     width: 100,
                     height: 20,
                     decoration: BoxDecoration(
-                      color: AppColors.onSurface.withOpacity(0.1),
+                      color: AppColors.darkOnSurface.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
                   const SizedBox(height: 32),
                   Container(
                     height: 1,
-                    color: AppColors.onSurface.withOpacity(0.08),
+                    color: AppColors.darkOnSurface.withOpacity(0.08),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -591,7 +592,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                         width: 70,
                         height: 24,
                         decoration: BoxDecoration(
-                          color: AppColors.onSurface.withOpacity(0.1),
+                          color: AppColors.darkOnSurface.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
@@ -602,7 +603,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                     width: double.infinity,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: AppColors.onSurface.withOpacity(0.1),
+                      color: AppColors.darkOnSurface.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -611,7 +612,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                     width: double.infinity,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: AppColors.onSurface.withOpacity(0.1),
+                      color: AppColors.darkOnSurface.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -620,7 +621,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                     width: 150,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: AppColors.onSurface.withOpacity(0.1),
+                      color: AppColors.darkOnSurface.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -631,7 +632,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(
-                            color: AppColors.onSurface.withOpacity(0.1),
+                            color: AppColors.darkOnSurface.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
@@ -641,7 +642,7 @@ class _WordCardsSkeletonState extends State<_WordCardsSkeleton>
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(
-                            color: AppColors.onSurface.withOpacity(0.1),
+                            color: AppColors.darkOnSurface.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),

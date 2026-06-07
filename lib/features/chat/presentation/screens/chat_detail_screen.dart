@@ -241,7 +241,7 @@ class _InputBarState extends State<_InputBar> {
       ),
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.surfaceVariant)),
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         children: [
@@ -255,7 +255,13 @@ class _InputBarState extends State<_InputBar> {
                 hintText: AppStrings.escribeMensaje,
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                fillColor: AppColors.surfaceVariant,
+                filled: true,
                 border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(24)),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(24)),
                   borderSide: BorderSide.none,
                 ),
@@ -265,15 +271,14 @@ class _InputBarState extends State<_InputBar> {
           const SizedBox(width: 8),
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: _hasText ? const Color(0xFF0F172A) : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
             child: IconButton(
               onPressed: _hasText ? widget.onSend : null,
               icon: const Icon(Icons.send_rounded),
-              color: _hasText ? AppColors.primary : AppColors.onSurfaceMuted,
-              style: IconButton.styleFrom(
-                backgroundColor: _hasText
-                    ? AppColors.primary.withAlpha(30)
-                    : Colors.transparent,
-              ),
+              color: _hasText ? Colors.white : AppColors.onSurfaceMuted,
             ),
           ),
         ],

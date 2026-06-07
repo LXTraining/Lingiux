@@ -4,6 +4,7 @@ import '../../../chat/presentation/screens/chats_list_screen.dart';
 import '../../../create_card/presentation/screens/create_card_screen.dart';
 import '../../../community/presentation/screens/community_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -31,37 +32,73 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _selectedIndex,
         children: _screens,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: AppStrings.navInicio,
+      bottomNavigationBar: Container(
+        height: 72 + MediaQuery.of(context).padding.bottom,
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 10,
+          bottom: MediaQuery.of(context).padding.bottom + 10,
+        ),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 1),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline_rounded),
-            selectedIcon: Icon(Icons.chat_bubble_rounded),
-            label: AppStrings.navChats,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.add_circle_outline_rounded),
-            selectedIcon: Icon(Icons.add_circle_rounded),
-            label: AppStrings.navCrear,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline_rounded),
-            selectedIcon: Icon(Icons.people_rounded),
-            label: AppStrings.navComunidad,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: AppStrings.navPerfil,
-          ),
-        ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, AppStrings.navInicio),
+            _buildNavItem(1, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, AppStrings.navChats),
+            _buildNavItem(2, Icons.add_circle_outline_rounded, Icons.add_circle_rounded, AppStrings.navCrear),
+            _buildNavItem(3, Icons.people_outline_rounded, Icons.people_rounded, AppStrings.navComunidad),
+            _buildNavItem(4, Icons.person_outline_rounded, Icons.person_rounded, AppStrings.navPerfil),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData outlineIcon, IconData solidIcon, String label) {
+    final isSelected = _selectedIndex == index;
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedIndex = index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 16 : 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0F172A) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? solidIcon : outlineIcon,
+              color: isSelected ? Colors.white : AppColors.onSurfaceMuted,
+              size: 22,
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

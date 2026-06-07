@@ -32,12 +32,22 @@ class MessageBubble extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: isMe
                   ? const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFF6D28D9)],
+                      colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
                   : null,
-              color: isMe ? null : AppColors.surfaceVariant,
+              color: isMe ? null : AppColors.surface,
+              border: isMe ? null : Border.all(color: AppColors.border, width: 1),
+              boxShadow: isMe
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(18),
                 topRight: const Radius.circular(18),
