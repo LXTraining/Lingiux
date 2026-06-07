@@ -18,57 +18,85 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.mensajes),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Container(
+      color: AppColors.background,
+      child: Stack(
         children: [
-          // Selector Segmentado de Pestañas
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                _buildSegment(0, 'Mensajes'),
-                const SizedBox(width: 12),
-                _buildSegment(1, 'Grupos'),
-              ],
+          // Degradado superior premium
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 320,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.gradientBgStart.withValues(alpha: 0.45),
+                    AppColors.gradientBgEnd.withValues(alpha: 0.45),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          
-          // Listado de Chats
-          Expanded(
-            child: mockChats.isEmpty
-                ? const _EmptyChats()
-                : ListView.builder(
-                    itemCount: mockChats.length,
-                    padding: const EdgeInsets.only(bottom: 20),
-                    itemBuilder: (context, index) {
-                      final chat = mockChats[index];
-                      return _ChatListTile(
-                        chat: chat,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatDetailScreen(chat: chat),
-                          ),
-                        ),
-                      );
-                    },
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              title: const Text(AppStrings.mensajes),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.search_rounded),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () {},
+                ),
+                const SizedBox(width: 4),
+              ],
+            ),
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Selector Segmentado de Pestañas
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      _buildSegment(0, 'Mensajes'),
+                      const SizedBox(width: 12),
+                      _buildSegment(1, 'Grupos'),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 4),
+                
+                // Listado de Chats
+                Expanded(
+                  child: mockChats.isEmpty
+                      ? const _EmptyChats()
+                      : ListView.builder(
+                          itemCount: mockChats.length,
+                          padding: const EdgeInsets.only(bottom: 20),
+                          itemBuilder: (context, index) {
+                            final chat = mockChats[index];
+                            return _ChatListTile(
+                              chat: chat,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatDetailScreen(chat: chat),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
