@@ -368,30 +368,55 @@ class _WordCard extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   // 3. Tags (Centrados)
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _Tag(label: 'adjective'),
-                      SizedBox(width: 8),
-                      _Tag(label: 'B2 level'),
-                      SizedBox(width: 8),
-                      _Tag(label: 'English'),
+                      if (wordCard.category != null && wordCard.category!.isNotEmpty) ...[
+                        _Tag(label: wordCard.category!),
+                        const SizedBox(width: 8),
+                      ],
+                      if (wordCard.language != null && wordCard.language!.isNotEmpty) ...[
+                        _Tag(label: wordCard.language!),
+                        const SizedBox(width: 8),
+                      ],
+                      if ((wordCard.category == null || wordCard.category!.isEmpty) &&
+                          (wordCard.language == null || wordCard.language!.isEmpty))
+                        const _Tag(label: 'Vocabulary'),
                     ],
                   ),
                   const SizedBox(height: 12),
 
-                  // Definición (Centrada y Scrollable si es necesario)
+                  // Definición y frase de ejemplo (Centrada y Scrollable si es necesario)
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      child: Text(
-                        wordCard.definition,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            wordCard.definition,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 14,
+                              height: 1.5,
+                            ),
+                          ),
+                          if (wordCard.exampleSentence != null &&
+                              wordCard.exampleSentence!.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              '"${wordCard.exampleSentence}"',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                fontSize: 13.5,
+                                fontStyle: FontStyle.italic,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),

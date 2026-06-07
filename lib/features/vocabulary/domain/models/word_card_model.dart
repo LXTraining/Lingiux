@@ -5,6 +5,9 @@ class WordCardModel {
   final String phonetic;
   final String imageUrl;
   final DateTime createdAt;
+  final String? exampleSentence;
+  final String? category;
+  final String? language;
 
   const WordCardModel({
     required this.id,
@@ -13,6 +16,9 @@ class WordCardModel {
     required this.phonetic,
     required this.imageUrl,
     required this.createdAt,
+    this.exampleSentence,
+    this.category,
+    this.language,
   });
 
   factory WordCardModel.fromJson(Map<String, dynamic> json) {
@@ -23,6 +29,9 @@ class WordCardModel {
       phonetic: json['phonetic'] as String,
       imageUrl: json['image_url'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
+      exampleSentence: json['example_sentence'] as String?,
+      category: json['category'] as String?,
+      language: json['language'] as String?,
     );
   }
 
@@ -34,6 +43,9 @@ class WordCardModel {
       'phonetic': phonetic,
       'image_url': imageUrl,
       'created_at': createdAt.toIso8601String(),
+      'example_sentence': exampleSentence,
+      'category': category,
+      'language': language,
     };
   }
 }
