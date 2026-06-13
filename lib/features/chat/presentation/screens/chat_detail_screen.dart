@@ -95,69 +95,71 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             Positioned(
               left: left,
               top: top,
-              child: FlippableCard(
-                controller: cardController,
-                front: _WordMiniCardFront(
-                  word: cleanWord,
-                  onTap: () {
-                    _dismissOverlay();
-                    Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (context, animation, secondaryAnimation) =>
-                            WordDetailScreen(selectedWord: cleanWord),
-                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOut,
-                            ),
-                            child: ScaleTransition(
-                              scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                                CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOut,
-                                ),
+              child: _OverlayEntrance(
+                child: FlippableCard(
+                  controller: cardController,
+                  front: _WordMiniCardFront(
+                    word: cleanWord,
+                    onTap: () {
+                      _dismissOverlay();
+                      Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) =>
+                              WordDetailScreen(selectedWord: cleanWord),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return FadeTransition(
+                              opacity: CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOut,
                               ),
-                              child: child,
-                            ),
-                          );
-                        },
-                        transitionDuration: const Duration(milliseconds: 280),
-                      ),
-                    );
-                  },
-                ),
-                back: _WordMiniCardBack(
-                  word: cleanWord,
-                  onTap: () {
-                    _dismissOverlay();
-                    Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (context, animation, secondaryAnimation) =>
-                            WordDetailScreen(selectedWord: cleanWord),
-                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOut,
-                            ),
-                            child: ScaleTransition(
-                              scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                                CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOut,
+                              child: ScaleTransition(
+                                scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                                  CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOut,
+                                  ),
                                 ),
+                                child: child,
                               ),
-                              child: child,
-                            ),
-                          );
-                        },
-                        transitionDuration: const Duration(milliseconds: 280),
-                      ),
-                    );
-                  },
+                            );
+                          },
+                          transitionDuration: const Duration(milliseconds: 280),
+                        ),
+                      );
+                    },
+                  ),
+                  back: _WordMiniCardBack(
+                    word: cleanWord,
+                    onTap: () {
+                      _dismissOverlay();
+                      Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) =>
+                              WordDetailScreen(selectedWord: cleanWord),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return FadeTransition(
+                              opacity: CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOut,
+                              ),
+                              child: ScaleTransition(
+                                scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                                  CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOut,
+                                  ),
+                                ),
+                                child: child,
+                              ),
+                            );
+                          },
+                          transitionDuration: const Duration(milliseconds: 280),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -758,4 +760,53 @@ class _FlippableCardState extends State<FlippableCard>
 class FlippableCardController {
   _FlippableCardState? _state;
   void flip({required bool swipeRight}) => _state?.toggleCard(swipeRight: swipeRight);
+}
+
+class _OverlayEntrance extends StatefulWidget {
+  final Widget child;
+
+  const _OverlayEntrance({required this.child});
+
+  @override
+  State<_OverlayEntrance> createState() => _OverlayEntranceState();
+}
+
+class _OverlayEntranceState extends State<_OverlayEntrance>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacityAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: widget.child,
+      ),
+    );
+  }
 }
