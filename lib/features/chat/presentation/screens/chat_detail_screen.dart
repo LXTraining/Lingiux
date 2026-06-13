@@ -70,7 +70,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity != null &&
               details.primaryVelocity!.abs() > 200) {
-            cardController.flip();
+            final swipeRight = details.primaryVelocity! > 0;
+            cardController.flip(swipeRight: swipeRight);
           }
         },
         child: Stack(
@@ -674,6 +675,7 @@ class _FlippableCardState extends State<FlippableCard>
   late AnimationController _animationController;
   late Animation<double> _animation;
   bool _isFront = true;
+  double _directionMultiplier = 1.0;
 
   @override
   void initState() {
@@ -689,7 +691,15 @@ class _FlippableCardState extends State<FlippableCard>
     widget.controller?._state = this;
   }
 
-  void toggleCard() {
+  void toggleCard({required bool swipeRight}) {
+    setState(() {
+      if (_isFront) {
+        _directionMultiplier = swipeRight ? -1.0 : 1.0;
+      } else {
+        _directionMultiplier = swipeRight ? 1.0 : -1.0;
+      }
+    });
+
     if (_isFront) {
       _animationController.forward();
     } else {
@@ -711,8 +721,8 @@ class _FlippableCardState extends State<FlippableCard>
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
-        final double angle = _animation.value * math.pi;
-        final bool showFront = angle < math.pi / 2;
+        final double angle = _animation.value * math.pi * _directionMultiplier;
+        final bool showFront = angle.abs() < math.pi / 2;
 
         final Matrix4 transform = Matrix4.identity()
           ..setEntry(3, 2, 0.002) // 3D perspective
@@ -736,5 +746,5 @@ class _FlippableCardState extends State<FlippableCard>
 
 class FlippableCardController {
   _FlippableCardState? _state;
-  void flip() => _state?.toggleCard();
+  void flip({required bool swipeRight}) => _state?.toggleCard(swipeRight: swipeRight);
 }
