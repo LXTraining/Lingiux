@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -60,51 +61,96 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     top =
         top.clamp(kToolbarHeight + 16.0, screenSize.height - cardHeight - 90);
 
+    final cardController = FlippableCardController();
+
     _overlayEntry = OverlayEntry(
-      builder: (_) => Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _dismissOverlay,
-              behavior: HitTestBehavior.translucent,
+      builder: (_) => GestureDetector(
+        onTap: _dismissOverlay,
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity != null &&
+              details.primaryVelocity!.abs() > 200) {
+            cardController.flip();
+          }
+        },
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                color: Colors.transparent,
+              ),
             ),
-          ),
-          Positioned(
-            left: left,
-            top: top,
-            child: _WordMiniCard(
-              word: cleanWord,
-              onTap: () {
-                _dismissOverlay();
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (_, animation, __) =>
-                        WordDetailScreen(selectedWord: cleanWord),
-                    transitionsBuilder: (_, animation, __, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: ScaleTransition(
-                          scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                            CurvedAnimation(
+            Positioned(
+              left: left,
+              top: top,
+              child: FlippableCard(
+                controller: cardController,
+                front: _WordMiniCardFront(
+                  word: cleanWord,
+                  onTap: () {
+                    _dismissOverlay();
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) =>
+                            WordDetailScreen(selectedWord: cleanWord),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          return FadeTransition(
+                            opacity: CurvedAnimation(
                               parent: animation,
                               curve: Curves.easeOut,
                             ),
-                          ),
-                          child: child,
-                        ),
-                      );
-                    },
-                    transitionDuration: const Duration(milliseconds: 280),
-                  ),
-                );
-              },
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOut,
+                                ),
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                        transitionDuration: const Duration(milliseconds: 280),
+                      ),
+                    );
+                  },
+                ),
+                back: _WordMiniCardBack(
+                  word: cleanWord,
+                  onTap: () {
+                    _dismissOverlay();
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) =>
+                            WordDetailScreen(selectedWord: cleanWord),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          return FadeTransition(
+                            opacity: CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOut,
+                            ),
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOut,
+                                ),
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                        transitionDuration: const Duration(milliseconds: 280),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 
@@ -325,16 +371,19 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _WordMiniCard extends ConsumerWidget {
-  final String word;
+class _MiniCardBase extends StatelessWidget {
+  final Widget child;
+  final List<Widget> background;
   final VoidCallback onTap;
 
-  const _WordMiniCard({required this.word, required this.onTap});
+  const _MiniCardBase({
+    required this.child,
+    this.background = const [],
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final wordCardsAsync = ref.watch(wordCardsProvider);
-
+  Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Material(
@@ -359,44 +408,7 @@ class _WordMiniCard extends ConsumerWidget {
           ),
           child: Stack(
             children: [
-              // 1. Imagen de fondo representativa si existe en la base de datos
-              ...wordCardsAsync.when(
-                data: (wordList) {
-                  WordCardModel? matchingCard;
-                  for (final w in wordList) {
-                    if (w.word.toLowerCase() == word.toLowerCase()) {
-                      matchingCard = w;
-                      break;
-                    }
-                  }
-
-                  if (matchingCard != null) {
-                    return [
-                      Positioned.fill(
-                        child: Opacity(
-                          opacity: 0.70, // Un poco de transparencia para mezclar con el degradado
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: CachedNetworkImage(
-                              imageUrl: matchingCard.imageUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: Colors.white.withOpacity(0.1),
-                              ),
-                              errorWidget: (context, url, error) => const SizedBox(),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ];
-                  }
-                  return [];
-                },
-                loading: () => [],
-                error: (_, __) => [],
-              ),
-
-              // 2. Círculo decorativo
+              ...background,
               Positioned(
                 right: -14,
                 top: -14,
@@ -409,8 +421,6 @@ class _WordMiniCard extends ConsumerWidget {
                   ),
                 ),
               ),
-
-              // 3. Contenido de textos y botón de acción con degradado oscuro para legibilidad
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
@@ -425,57 +435,7 @@ class _WordMiniCard extends ConsumerWidget {
                     ),
                   ),
                   padding: const EdgeInsets.all(12),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.auto_stories_outlined,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        word,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          height: 1.2,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black45,
-                              blurRadius: 4,
-                              offset: Offset(0, 1),
-                            )
-                          ],
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.25),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.15),
-                            width: 0.5,
-                          ),
-                        ),
-                        child: const Text(
-                          'Open',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: child,
                 ),
               ),
             ],
@@ -484,4 +444,297 @@ class _WordMiniCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _WordMiniCardFront extends ConsumerWidget {
+  final String word;
+  final VoidCallback onTap;
+
+  const _WordMiniCardFront({required this.word, required this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wordCardsAsync = ref.watch(wordCardsProvider);
+
+    return _MiniCardBase(
+      onTap: onTap,
+      background: wordCardsAsync.when(
+        data: (wordList) {
+          WordCardModel? matchingCard;
+          for (final w in wordList) {
+            if (w.word.toLowerCase() == word.toLowerCase()) {
+              matchingCard = w;
+              break;
+            }
+          }
+
+          if (matchingCard != null) {
+            return [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.70,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: CachedNetworkImage(
+                      imageUrl: matchingCard.imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      errorWidget: (context, url, error) => const SizedBox(),
+                    ),
+                  ),
+                ),
+              ),
+            ];
+          }
+          return [];
+        },
+        loading: () => [],
+        error: (error, _) => [],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.auto_stories_outlined,
+            color: Colors.white,
+            size: 22,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            word,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              height: 1.2,
+              shadows: [
+                Shadow(
+                  color: Colors.black45,
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                )
+              ],
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.15),
+                width: 0.5,
+              ),
+            ),
+            child: const Text(
+              'Open',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WordMiniCardBack extends ConsumerWidget {
+  final String word;
+  final VoidCallback onTap;
+
+  const _WordMiniCardBack({required this.word, required this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wordCardsAsync = ref.watch(wordCardsProvider);
+
+    return _MiniCardBase(
+      onTap: onTap,
+      child: wordCardsAsync.when(
+        data: (wordList) {
+          WordCardModel? matchingCard;
+          for (final w in wordList) {
+            if (w.word.toLowerCase() == word.toLowerCase()) {
+              matchingCard = w;
+              break;
+            }
+          }
+
+          final definition = matchingCard?.definition ?? 'Sin definición';
+          final phonetic = matchingCard?.phonetic ?? '';
+
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.g_translate_outlined,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(height: 6),
+              if (phonetic.isNotEmpty) ...[
+                Text(
+                  phonetic,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 9,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+              ],
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    physics: const NeverScrollableScrollPhysics(),
+                    child: Text(
+                      definition,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black45,
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          )
+                        ],
+                      ),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Icon(
+                Icons.flip_camera_android_outlined,
+                color: Colors.white70,
+                size: 14,
+              ),
+            ],
+          );
+        },
+        loading: () => const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+        error: (error, _) => const Center(
+          child: Text(
+            'Error',
+            style: TextStyle(color: Colors.white, fontSize: 10),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class FlippableCard extends StatefulWidget {
+  final Widget front;
+  final Widget back;
+  final Duration duration;
+  final FlippableCardController? controller;
+
+  const FlippableCard({
+    super.key,
+    required this.front,
+    required this.back,
+    this.duration = const Duration(milliseconds: 250),
+    this.controller,
+  });
+
+  @override
+  State<FlippableCard> createState() => _FlippableCardState();
+}
+
+class _FlippableCardState extends State<FlippableCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  bool _isFront = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+    );
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    widget.controller?._state = this;
+  }
+
+  void toggleCard() {
+    if (_isFront) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+    setState(() {
+      _isFront = !_isFront;
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        final double angle = _animation.value * math.pi;
+        final bool showFront = angle < math.pi / 2;
+
+        final Matrix4 transform = Matrix4.identity()
+          ..setEntry(3, 2, 0.002) // 3D perspective
+          ..rotateY(angle);
+
+        return Transform(
+          transform: transform,
+          alignment: Alignment.center,
+          child: showFront
+              ? widget.front
+              : Transform(
+                  transform: Matrix4.identity()..rotateY(math.pi),
+                  alignment: Alignment.center,
+                  child: widget.back,
+                ),
+        );
+      },
+    );
+  }
+}
+
+class FlippableCardController {
+  _FlippableCardState? _state;
+  void flip() => _state?.toggleCard();
 }
