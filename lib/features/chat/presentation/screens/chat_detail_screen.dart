@@ -44,7 +44,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _overlayEntry = null;
   }
 
-  void _showWordCard(String word, Offset globalPosition) {
+  void _showWordCard(String word, Offset globalPosition, Size wordSize) {
     _dismissOverlay();
 
     final cleanWord =
@@ -54,12 +54,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final screenSize = MediaQuery.of(context).size;
     const cardWidth = 96.0;
     const cardHeight = 136.0;
+    const spacing = 8.0;
+    final safeAreaTop = MediaQuery.of(context).padding.top + kToolbarHeight;
+    final safeAreaBottom = MediaQuery.of(context).padding.bottom;
 
     double left = globalPosition.dx - cardWidth / 2;
-    double top = globalPosition.dy - cardHeight - 16;
+    double top = globalPosition.dy - cardHeight - spacing;
+
+    // Si no hay suficiente espacio arriba, mostrar debajo de la palabra
+    if (top < safeAreaTop + 8.0) {
+      top = globalPosition.dy + wordSize.height + spacing;
+    }
+
     left = left.clamp(8.0, screenSize.width - cardWidth - 8);
-    top =
-        top.clamp(kToolbarHeight + 16.0, screenSize.height - cardHeight - 90);
+    top = top.clamp(
+      safeAreaTop + 8.0,
+      screenSize.height - cardHeight - safeAreaBottom - 16.0,
+    );
 
     final cardController = FlippableCardController();
 

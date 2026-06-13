@@ -5,7 +5,7 @@ import '../../../../../core/utils/formatters.dart';
 
 class MessageBubble extends StatelessWidget {
   final MessageEntity message;
-  final Function(String, Offset) onWordTap;
+  final Function(String, Offset, Size) onWordTap;
 
   const MessageBubble({
     super.key,
@@ -110,7 +110,7 @@ class _TappableWord extends StatefulWidget {
   final String word;
   final String displayText;
   final TextStyle textStyle;
-  final Function(String, Offset) onTap;
+  final Function(String, Offset, Size) onTap;
 
   const _TappableWord({
     required this.word,
@@ -134,7 +134,11 @@ class _TappableWordState extends State<_TappableWord> {
         setState(() => _pressed = false);
         final RenderBox box = context.findRenderObject() as RenderBox;
         final Offset globalPosition = box.localToGlobal(Offset.zero);
-        widget.onTap(widget.word, globalPosition);
+        final Offset centerPosition = Offset(
+          globalPosition.dx + box.size.width / 2,
+          globalPosition.dy,
+        );
+        widget.onTap(widget.word, centerPosition, box.size);
       },
       onTapCancel: () => setState(() => _pressed = false),
       child: AnimatedContainer(
