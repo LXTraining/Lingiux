@@ -62,8 +62,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     double top = globalPosition.dy - cardHeight - spacing;
 
     // Si no hay suficiente espacio arriba, mostrar debajo de la palabra
+    bool isBelow = false;
     if (top < safeAreaTop + 8.0) {
       top = globalPosition.dy + wordSize.height + spacing;
+      isBelow = true;
     }
 
     left = left.clamp(8.0, screenSize.width - cardWidth - 8);
@@ -96,6 +98,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               left: left,
               top: top,
               child: _OverlayEntrance(
+                isBelow: isBelow,
                 child: FlippableCard(
                   controller: cardController,
                   front: _WordMiniCardFront(
@@ -764,8 +767,9 @@ class FlippableCardController {
 
 class _OverlayEntrance extends StatefulWidget {
   final Widget child;
+  final bool isBelow;
 
-  const _OverlayEntrance({required this.child});
+  const _OverlayEntrance({required this.child, required this.isBelow});
 
   @override
   State<_OverlayEntrance> createState() => _OverlayEntranceState();
@@ -776,20 +780,25 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
+  late Animation<double> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 180),
+      duration: const Duration(milliseconds: 200),
     );
-    _scaleAnimation = Tween<double>(begin: 0.4, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
+    _slideAnimation = Tween<double>(
+      begin: widget.isBelow ? -8.0 : 8.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _controller.forward();
   }
 
@@ -803,9 +812,18 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _opacityAnimation,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: widget.child,
+      child: AnimatedBuilder(
+        animation: _slideAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(0, _slideAnimation.value),
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              alignment: widget.isBelow ? Alignment.topCenter : Alignment.bottomCenter,
+              child: widget.child,
+            ),
+          );
+        },
       ),
     );
   }
