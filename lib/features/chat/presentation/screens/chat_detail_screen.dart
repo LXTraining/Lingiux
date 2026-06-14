@@ -1,25 +1,27 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../widgets/message_bubble.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
+import '../../../../../core/services/audio_service.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 
-class ChatDetailScreen extends StatefulWidget {
+class ChatDetailScreen extends ConsumerStatefulWidget {
   final ChatEntity chat;
 
   const ChatDetailScreen({super.key, required this.chat});
 
   @override
-  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
+  ConsumerState<ChatDetailScreen> createState() => _ChatDetailScreenState();
 }
 
-class _ChatDetailScreenState extends State<ChatDetailScreen> {
+class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   late List<MessageEntity> _messages;
@@ -50,6 +52,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final cleanWord =
         word.replaceAll(RegExp(r"[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ']"), '');
     if (cleanWord.length < 2) return;
+
+    ref.read(audioServiceProvider).playTap();
+    HapticFeedback.lightImpact();
 
     final screenSize = MediaQuery.of(context).size;
     const cardWidth = 96.0;
