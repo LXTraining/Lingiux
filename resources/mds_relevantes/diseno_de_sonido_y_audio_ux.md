@@ -30,7 +30,8 @@ lingiux_app/
   └── assets/
       └── sounds/
           ├── tap_pop.wav
-          └── tap_pop.mp3
+          ├── tap_pop.mp3
+          └── card_flip.mp3
 ```
 
 ### 2.1 Registro dinámico por Directorio (Mejor Práctica)

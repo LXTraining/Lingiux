@@ -90,6 +90,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               details.primaryVelocity!.abs() > 200) {
             final swipeRight = details.primaryVelocity! > 0;
             cardController.flip(swipeRight: swipeRight);
+            ref.read(audioServiceProvider).playFlip();
+            HapticFeedback.selectionClick();
           }
         },
         child: Stack(
