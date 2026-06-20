@@ -49,8 +49,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   void _showWordCard(String word, Offset globalPosition, Size wordSize) {
     _dismissOverlay();
 
-    final cleanWord =
-        word.replaceAll(RegExp(r"[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ']"), '');
+    final cleanWord = word.replaceAll(RegExp(r"[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ']"), '');
     if (cleanWord.length < 2) return;
 
     ref.read(audioServiceProvider).playTap();
@@ -82,98 +81,85 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final cardController = FlippableCardController();
 
     _overlayEntry = OverlayEntry(
-      builder: (_) => GestureDetector(
-        onTap: _dismissOverlay,
-        behavior: HitTestBehavior.translucent,
+      builder: (_) => _OverlayEntrance(
+        isBelow: isBelow,
+        left: left,
+        top: top,
+        onDismiss: _dismissOverlay,
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity != null &&
               details.primaryVelocity!.abs() > 200) {
             final swipeRight = details.primaryVelocity! > 0;
             cardController.flip(swipeRight: swipeRight);
-            ref.read(audioServiceProvider).playFlip();
             HapticFeedback.selectionClick();
           }
         },
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Container(
-                color: Colors.transparent,
-              ),
-            ),
-            Positioned(
-              left: left,
-              top: top,
-              child: _OverlayEntrance(
-                isBelow: isBelow,
-                child: FlippableCard(
-                  controller: cardController,
-                  front: _WordMiniCardFront(
-                    word: cleanWord,
-                    onTap: () {
-                      _dismissOverlay();
-                      Navigator.push(
-                        context,
-                        PageRouteBuilder(
-                          pageBuilder: (context, animation, secondaryAnimation) =>
-                              WordDetailScreen(selectedWord: cleanWord),
-                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                            return FadeTransition(
-                              opacity: CurvedAnimation(
+        child: FlippableCard(
+          controller: cardController,
+          front: _WordMiniCardFront(
+            word: cleanWord,
+            onTap: () {
+              _dismissOverlay();
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      WordDetailScreen(selectedWord: cleanWord),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: ScaleTransition(
+                            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                              CurvedAnimation(
                                 parent: animation,
                                 curve: Curves.easeOut,
                               ),
-                              child: ScaleTransition(
-                                scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                                  CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOut,
-                                  ),
-                                ),
-                                child: child,
-                              ),
-                            );
-                          },
-                          transitionDuration: const Duration(milliseconds: 280),
-                        ),
-                      );
-                    },
-                  ),
-                  back: _WordMiniCardBack(
-                    word: cleanWord,
-                    onTap: () {
-                      _dismissOverlay();
-                      Navigator.push(
-                        context,
-                        PageRouteBuilder(
-                          pageBuilder: (context, animation, secondaryAnimation) =>
-                              WordDetailScreen(selectedWord: cleanWord),
-                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                            return FadeTransition(
-                              opacity: CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOut,
-                              ),
-                              child: ScaleTransition(
-                                scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                                  CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOut,
-                                  ),
-                                ),
-                                child: child,
-                              ),
-                            );
-                          },
-                          transitionDuration: const Duration(milliseconds: 280),
-                        ),
-                      );
-                    },
-                  ),
+                            ),
+                            child: child,
+                          ),
+                        );
+                      },
+                  transitionDuration: const Duration(milliseconds: 280),
                 ),
-              ),
-            ),
-          ],
+              );
+            },
+          ),
+          back: _WordMiniCardBack(
+            word: cleanWord,
+            onTap: () {
+              _dismissOverlay();
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      WordDetailScreen(selectedWord: cleanWord),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: ScaleTransition(
+                            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOut,
+                              ),
+                            ),
+                            child: child,
+                          ),
+                        );
+                      },
+                  transitionDuration: const Duration(milliseconds: 280),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -186,12 +172,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     if (text.isEmpty) return;
 
     setState(() {
-      _messages.add(MessageEntity(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: text,
-        isMe: true,
-        time: DateTime.now(),
-      ));
+      _messages.add(
+        MessageEntity(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          text: text,
+          isMe: true,
+          time: DateTime.now(),
+        ),
+      );
     });
 
     _controller.clear();
@@ -233,10 +221,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   if (widget.chat.isOnline)
                     const Text(
                       'en línea',
-                      style: TextStyle(
-                        color: AppColors.online,
-                        fontSize: 11,
-                      ),
+                      style: TextStyle(color: AppColors.online, fontSize: 11),
                     ),
                 ],
               ),
@@ -247,10 +232,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               icon: const Icon(Icons.videocam_outlined),
               onPressed: () {},
             ),
-            IconButton(
-              icon: const Icon(Icons.call_outlined),
-              onPressed: () {},
-            ),
+            IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
           ],
         ),
         body: Column(
@@ -258,8 +240,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 itemCount: _messages.length,
                 itemBuilder: (context, index) => MessageBubble(
                   message: _messages[index],
@@ -267,10 +251,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 ),
               ),
             ),
-            _InputBar(
-              controller: _controller,
-              onSend: _sendMessage,
-            ),
+            _InputBar(controller: _controller, onSend: _sendMessage),
           ],
         ),
       ),
@@ -323,8 +304,10 @@ class _InputBarState extends State<_InputBar> {
               style: const TextStyle(color: AppColors.onSurface, fontSize: 15),
               decoration: const InputDecoration(
                 hintText: AppStrings.escribeMensaje,
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 fillColor: AppColors.surfaceVariant,
                 filled: true,
                 border: OutlineInputBorder(
@@ -502,9 +485,8 @@ class _WordMiniCardFront extends ConsumerWidget {
                     child: CachedNetworkImage(
                       imageUrl: matchingCard.imageUrl,
                       fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        color: Colors.white.withOpacity(0.1),
-                      ),
+                      placeholder: (context, url) =>
+                          Container(color: Colors.white.withOpacity(0.1)),
                       errorWidget: (context, url, error) => const SizedBox(),
                     ),
                   ),
@@ -539,7 +521,7 @@ class _WordMiniCardFront extends ConsumerWidget {
                   color: Colors.black45,
                   blurRadius: 4,
                   offset: Offset(0, 1),
-                )
+                ),
               ],
             ),
             maxLines: 2,
@@ -636,7 +618,7 @@ class _WordMiniCardBack extends ConsumerWidget {
                             color: Colors.black45,
                             blurRadius: 4,
                             offset: Offset(0, 1),
-                          )
+                          ),
                         ],
                       ),
                       maxLines: 4,
@@ -769,14 +751,26 @@ class _FlippableCardState extends State<FlippableCard>
 
 class FlippableCardController {
   _FlippableCardState? _state;
-  void flip({required bool swipeRight}) => _state?.toggleCard(swipeRight: swipeRight);
+  void flip({required bool swipeRight}) =>
+      _state?.toggleCard(swipeRight: swipeRight);
 }
 
 class _OverlayEntrance extends StatefulWidget {
   final Widget child;
   final bool isBelow;
+  final double left;
+  final double top;
+  final VoidCallback onDismiss;
+  final GestureDragEndCallback? onHorizontalDragEnd;
 
-  const _OverlayEntrance({required this.child, required this.isBelow});
+  const _OverlayEntrance({
+    required this.child,
+    required this.isBelow,
+    required this.left,
+    required this.top,
+    required this.onDismiss,
+    this.onHorizontalDragEnd,
+  });
 
   @override
   State<_OverlayEntrance> createState() => _OverlayEntranceState();
@@ -788,6 +782,8 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
   late Animation<double> _slideAnimation;
+  late Animation<double> _backdropOpacityAnimation;
+  bool _isDismissing = false;
 
   @override
   void initState() {
@@ -796,17 +792,33 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
       vsync: this,
       duration: const Duration(milliseconds: 200),
     );
-    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _backdropOpacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 0.15,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _slideAnimation = Tween<double>(
       begin: widget.isBelow ? -8.0 : 8.0,
       end: 0.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _controller.forward();
+  }
+
+  void _handleDismiss() {
+    if (_isDismissing) return;
+    setState(() {
+      _isDismissing = true;
+    });
+    _controller.reverse().then((_) {
+      widget.onDismiss();
+    });
   }
 
   @override
@@ -817,20 +829,52 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _opacityAnimation,
-      child: AnimatedBuilder(
-        animation: _slideAnimation,
-        builder: (context, child) {
-          return Transform.translate(
-            offset: Offset(0, _slideAnimation.value),
-            child: ScaleTransition(
-              scale: _scaleAnimation,
-              alignment: widget.isBelow ? Alignment.topCenter : Alignment.bottomCenter,
-              child: widget.child,
+    return GestureDetector(
+      onTap: _handleDismiss,
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: widget.onHorizontalDragEnd,
+      child: Stack(
+        children: [
+          // Fondo oscuro animado (Backdrop)
+          AnimatedBuilder(
+            animation: _backdropOpacityAnimation,
+            builder: (context, child) {
+              return Positioned.fill(
+                child: Container(
+                  color: Colors.black.withOpacity(
+                    _backdropOpacityAnimation.value,
+                  ),
+                ),
+              );
+            },
+          ),
+          // La carta animada posicionada
+          Positioned(
+            left: widget.left,
+            top: widget.top,
+            child: GestureDetector(
+              onTap: () {}, // Previene cerrar al tocar dentro de la carta
+              child: FadeTransition(
+                opacity: _opacityAnimation,
+                child: AnimatedBuilder(
+                  animation: _slideAnimation,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(0, _slideAnimation.value),
+                      child: ScaleTransition(
+                        scale: _scaleAnimation,
+                        alignment: widget.isBelow
+                            ? Alignment.topCenter
+                            : Alignment.bottomCenter,
+                        child: widget.child,
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

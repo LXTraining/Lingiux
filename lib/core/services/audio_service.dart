@@ -14,6 +14,12 @@ class AudioService {
   Future<void> init() async {
     if (_initialized) return;
     try {
+      // Configurar el contexto global para mezclar audio con otras apps (sin pausar Spotify, etc.)
+      final audioContext = AudioContextConfig(
+        focus: AudioContextConfigFocus.mixWithOthers,
+      ).build();
+      await AudioPlayer.global.setAudioContext(audioContext);
+
       // 1. Detectar si existe tap_pop.mp3 en assets
       try {
         await rootBundle.load('assets/sounds/tap_pop.mp3');
