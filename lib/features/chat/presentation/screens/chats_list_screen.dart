@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/chat_entity.dart';
+import '../providers/chat_provider.dart';
 import 'chat_detail_screen.dart';
-import '../../../../../shared/data/mock_data.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/utils/formatters.dart';
 
-class ChatsListScreen extends StatefulWidget {
+class ChatsListScreen extends ConsumerStatefulWidget {
   const ChatsListScreen({super.key});
 
   @override
-  State<ChatsListScreen> createState() => _ChatsListScreenState();
+  ConsumerState<ChatsListScreen> createState() => _ChatsListScreenState();
 }
 
-class _ChatsListScreenState extends State<ChatsListScreen> {
+class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
   int _activeSegment = 0; // 0 = Mensajes, 1 = Grupos
 
   @override
   Widget build(BuildContext context) {
+    final chatsAsync = ref.watch(chatsProvider);
+
     return Container(
       color: AppColors.background,
       child: Stack(
@@ -76,24 +79,40 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
                 
                 // Listado de Chats
                 Expanded(
-                  child: mockChats.isEmpty
-                      ? const _EmptyChats()
-                      : ListView.builder(
-                          itemCount: mockChats.length,
-                          padding: const EdgeInsets.only(bottom: 20),
-                          itemBuilder: (context, index) {
-                            final chat = mockChats[index];
-                            return _ChatListTile(
-                              chat: chat,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatDetailScreen(chat: chat),
-                                ),
+                  child: chatsAsync.when(
+                    data: (chats) {
+                      if (chats.isEmpty) {
+                        return const _EmptyChats();
+                      }
+                      return ListView.builder(
+                        itemCount: chats.length,
+                        padding: const EdgeInsets.only(bottom: 20),
+                        itemBuilder: (context, index) {
+                          final chat = chats[index];
+                          return _ChatListTile(
+                            chat: chat,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatDetailScreen(chat: chat),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    error: (error, stack) => Center(
+                      child: Text(
+                        'Error al cargar chats: $error',
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

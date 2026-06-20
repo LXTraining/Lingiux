@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../widgets/message_bubble.dart';
+import '../providers/chat_provider.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/services/audio_service.dart';
@@ -24,13 +25,11 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
 class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  late List<MessageEntity> _messages;
   OverlayEntry? _overlayEntry;
 
   @override
   void initState() {
     super.initState();
-    _messages = List.from(widget.chat.messages);
   }
 
   @override
@@ -171,27 +170,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    setState(() {
-      _messages.add(
-        MessageEntity(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          text: text,
-          isMe: true,
-          time: DateTime.now(),
-        ),
-      );
-    });
-
+    ref.read(chatServiceProvider).sendMessage(widget.chat.id, text);
     _controller.clear();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   @override
@@ -238,17 +218,31 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         body: Column(
           children: [
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) => MessageBubble(
-                  message: _messages[index],
-                  onWordTap: _showWordCard,
-                ),
+              child: ref.watch(messagesProvider(widget.chat.id)).when(
+                data: (messages) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_scrollController.hasClients) {
+                      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                    }
+                  });
+                  if (messages.isEmpty) {
+                    return const Center(child: Text('No hay mensajes aún. ¡Comienza a chatear!'));
+                  }
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) => MessageBubble(
+                      message: messages[index],
+                      onWordTap: _showWordCard,
+                    ),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                error: (error, stack) => Center(child: Text('Error al cargar mensajes: $error')),
               ),
             ),
             _InputBar(controller: _controller, onSend: _sendMessage),

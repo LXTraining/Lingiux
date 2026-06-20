@@ -183,6 +183,7 @@ class CreateCardFormScreen extends ConsumerStatefulWidget {
 
       // 3. Guardar la metadata en la tabla word_cards de Supabase
       await supabase.from('word_cards').insert({
+        'user_id': supabase.auth.currentUser?.id,
         'word': _wordController.text.trim(),
         'phonetic': _phoneticController.text.trim(),
         'definition': _definitionController.text.trim(),
