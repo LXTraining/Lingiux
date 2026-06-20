@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/word_card_model.dart';
 import '../providers/vocabulary_provider.dart';
@@ -18,16 +19,61 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   late PageController _pageController;
   int _currentPage = 0;
 
+  // Estado para la reproducción de audios remotos de las cartas
+  final AudioPlayer _networkPlayer = AudioPlayer();
+  String? _playingAudioUrl;
+  bool _isPlaying = false;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+
+    // Escuchar el estado del reproductor remoto para actualizar la interfaz
+    _networkPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+    _networkPlayer.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+          _playingAudioUrl = null;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _networkPlayer.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleAudio(String? url) async {
+    if (url == null || url.isEmpty) return;
+
+    try {
+      if (_playingAudioUrl == url) {
+        if (_isPlaying) {
+          await _networkPlayer.pause();
+        } else {
+          await _networkPlayer.resume();
+        }
+      } else {
+        await _networkPlayer.stop();
+        setState(() {
+          _playingAudioUrl = url;
+        });
+        await _networkPlayer.play(UrlSource(url));
+      }
+    } catch (e) {
+      debugPrint('Error al reproducir audio de Supabase: $e');
+    }
   }
 
   @override
@@ -155,12 +201,22 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                 child: PageView.builder(
                   controller: _pageController,
                   scrollDirection: Axis.vertical,
-                  onPageChanged: (index) => setState(() => _currentPage = index),
+                  onPageChanged: (index) {
+                    setState(() => _currentPage = index);
+                    _networkPlayer.stop();
+                    setState(() {
+                      _isPlaying = false;
+                      _playingAudioUrl = null;
+                    });
+                  },
                   itemBuilder: (context, index) {
                     final wordIndex = index % sortedWords.length;
+                    final card = sortedWords[wordIndex];
                     return _WordCard(
-                      wordCard: sortedWords[wordIndex],
+                      wordCard: card,
                       gradientIndex: index,
+                      isPlaying: _isPlaying && _playingAudioUrl == card.audioUrl,
+                      onPlayTapped: () => _toggleAudio(card.audioUrl),
                     );
                   },
                 ),
@@ -176,8 +232,15 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 class _WordCard extends StatelessWidget {
   final WordCardModel wordCard;
   final int gradientIndex;
+  final bool isPlaying;
+  final VoidCallback onPlayTapped;
 
-  const _WordCard({required this.wordCard, required this.gradientIndex});
+  const _WordCard({
+    required this.wordCard,
+    required this.gradientIndex,
+    required this.isPlaying,
+    required this.onPlayTapped,
+  });
 
   static const List<List<Color>> _gradients = [
     [Color(0xFF7C3AED), Color(0xFF4F46E5)],
@@ -269,21 +332,24 @@ class _WordCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () {},
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.volume_up_rounded,
-                            color: Colors.white,
-                            size: 18,
+                      if (wordCard.audioUrl != null && wordCard.audioUrl!.isNotEmpty)
+                        GestureDetector(
+                          onTap: onPlayTapped,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isPlaying
+                                  ? Colors.white.withOpacity(0.3)
+                                  : Colors.white.withOpacity(0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isPlaying ? Icons.pause_rounded : Icons.volume_up_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 10),

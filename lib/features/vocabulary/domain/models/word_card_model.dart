@@ -8,6 +8,7 @@ class WordCardModel {
   final String? exampleSentence;
   final String? category;
   final String? language;
+  final String? audioUrl;
 
   const WordCardModel({
     required this.id,
@@ -19,6 +20,7 @@ class WordCardModel {
     this.exampleSentence,
     this.category,
     this.language,
+    this.audioUrl,
   });
 
   factory WordCardModel.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class WordCardModel {
       exampleSentence: json['example_sentence'] as String?,
       category: json['category'] as String?,
       language: json['language'] as String?,
+      audioUrl: json['audio_url'] as String?,
     );
   }
 
@@ -46,6 +49,7 @@ class WordCardModel {
       'example_sentence': exampleSentence,
       'category': category,
       'language': language,
+      'audio_url': audioUrl,
     };
   }
 }
