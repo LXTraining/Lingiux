@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/chat_entity.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import 'chat_detail_screen.dart';
 import '../../../../../core/constants/app_colors.dart';
@@ -16,6 +18,16 @@ class ChatsListScreen extends ConsumerStatefulWidget {
 
 class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
   int _activeSegment = 0; // 0 = Mensajes, 1 = Grupos
+
+  void _showSearchUsersModal(BuildContext context) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _SearchUsersSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +68,7 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit_outlined),
-                  onPressed: () {},
+                  onPressed: () => _showSearchUsersModal(context),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -337,6 +349,206 @@ class _EmptyChats extends StatelessWidget {
           Text(
             'Conecta con otros aprendices de idiomas',
             style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchUsersSheet extends ConsumerStatefulWidget {
+  const _SearchUsersSheet();
+
+  @override
+  ConsumerState<_SearchUsersSheet> createState() => _SearchUsersSheetState();
+}
+
+class _SearchUsersSheetState extends ConsumerState<_SearchUsersSheet> {
+  final _searchController = TextEditingController();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearch(String val) async {
+    if (val.trim().isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isLoading = false;
+      });
+      return;
+    }
+    setState(() => _isLoading = true);
+    final currentUserId = ref.read(authProvider).user?.id ?? '';
+    final results = await ref.read(chatServiceProvider).searchProfiles(currentUserId, val);
+    setState(() {
+      _searchResults = results;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 80),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 12,
+        bottom: bottomInset + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Drag bar
+          Center(
+            child: Container(
+              width: 48,
+              height: 5,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Buscar Usuario',
+            style: TextStyle(
+              color: AppColors.onSurface,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Search Input
+          TextField(
+            controller: _searchController,
+            autofocus: true,
+            style: const TextStyle(color: AppColors.onSurface),
+            decoration: InputDecoration(
+              hintText: 'Escribe el nombre de un usuario...',
+              prefixIcon: const Icon(Icons.search_rounded, color: AppColors.onSurfaceMuted),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded),
+                      onPressed: () {
+                        _searchController.clear();
+                        _onSearch('');
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: _onSearch,
+          ),
+          const SizedBox(height: 20),
+
+          // Search Results
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 300),
+            child: _isLoading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: CircularProgressIndicator(color: AppColors.primary),
+                    ),
+                  )
+                : _searchResults.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Text(
+                            _searchController.text.isEmpty
+                                ? 'Busca por nombre para iniciar una conversación'
+                                : 'No se encontraron usuarios',
+                            style: const TextStyle(color: AppColors.onSurfaceMuted, fontSize: 14),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          final profile = _searchResults[index];
+                          final name = profile['full_name'] as String? ?? 'Usuario';
+                          final otherUserId = profile['id'] as String;
+                          final avatarUrl = profile['avatar_url'] as String?;
+                          final initials = name.trim().isNotEmpty
+                              ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+                              : 'LX';
+                          final color = AppColors.avatarColors[otherUserId.hashCode.abs() % AppColors.avatarColors.length];
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                            leading: CircleAvatar(
+                              backgroundColor: color.withValues(alpha: 0.12),
+                              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl == null || avatarUrl.isEmpty
+                                  ? Text(
+                                      initials,
+                                      style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                                    )
+                                  : null,
+                            ),
+                            title: Text(
+                              name,
+                              style: const TextStyle(
+                                color: AppColors.onSurface,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.onSurfaceMuted),
+                            onTap: () async {
+                              HapticFeedback.lightImpact();
+                              final currentUserId = ref.read(authProvider).user?.id ?? '';
+                              
+                              // Buscar o crear la sala de chat en Supabase
+                              final conversationId = await ref.read(chatServiceProvider).getOrCreateConversation(currentUserId, otherUserId);
+
+                              if (!context.mounted) return;
+                              Navigator.pop(context);
+
+                              // Mapear a entidad ChatEntity temporal
+                              final chat = ChatEntity(
+                                id: conversationId,
+                                name: name,
+                                initials: initials,
+                                avatarColorIndex: otherUserId.hashCode.abs(),
+                                lastMessage: '',
+                                lastMessageTime: DateTime.now(),
+                                unreadCount: 0,
+                                isOnline: false,
+                                messages: const [],
+                              );
+
+                              // Navegar al chat
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatDetailScreen(chat: chat),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
           ),
         ],
       ),

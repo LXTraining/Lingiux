@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../widgets/message_bubble.dart';
 import '../providers/chat_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/services/audio_service.dart';
@@ -170,7 +171,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    ref.read(chatServiceProvider).sendMessage(widget.chat.id, text);
+    final currentUserId = ref.read(authProvider).user?.id ?? '';
+    ref.read(chatServiceProvider).sendMessage(widget.chat.id, currentUserId, text);
     _controller.clear();
   }
 

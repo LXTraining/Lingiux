@@ -13,56 +13,68 @@ class ChatModel extends ChatEntity {
     required super.messages,
   });
 
-  factory ChatModel.fromJson(Map<String, dynamic> json, {List<MessageEntity> messages = const []}) {
+  factory ChatModel.fromJson(Map<String, dynamic> json, String currentUserId) {
+    final participants = json['all_participants'] as List<dynamic>? ?? [];
+    
+    // Buscar el participante que NO es el usuario actual
+    final otherParticipant = participants.firstWhere(
+      (p) => p['profile'] != null && p['profile']['id'] != currentUserId,
+      orElse: () => null,
+    );
+
+    final otherProfile = otherParticipant != null ? otherParticipant['profile'] as Map<String, dynamic> : null;
+    final otherName = otherProfile?['full_name'] as String? ?? 'Usuario de Lingiux';
+    
+    final initials = otherName.trim().isNotEmpty
+        ? otherName.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+        : 'LX';
+
+    // Generar un color avatar estable basado en el hash del nombre
+    final avatarColorIndex = otherName.hashCode.abs();
+
     return ChatModel(
       id: json['id'] as String,
-      name: json['name'] as String,
-      initials: json['initials'] as String,
-      avatarColorIndex: json['avatar_color_index'] as int,
+      name: otherName,
+      initials: initials,
+      avatarColorIndex: avatarColorIndex,
       lastMessage: json['last_message'] as String? ?? '',
-      lastMessageTime: DateTime.parse(json['last_message_time'] as String),
-      unreadCount: json['unread_count'] as int? ?? 0,
-      isOnline: json['is_online'] as bool? ?? false,
-      messages: messages,
+      lastMessageTime: json['last_message_time'] != null
+          ? DateTime.parse(json['last_message_time'] as String)
+          : DateTime.now(),
+      unreadCount: 0,
+      isOnline: false,
+      messages: const [],
     );
-  }
-
-  Map<String, dynamic> toJson(String userId) {
-    return {
-      'user_id': userId,
-      'name': name,
-      'initials': initials,
-      'avatar_color_index': avatarColorIndex,
-      'last_message': lastMessage,
-      'last_message_time': lastMessageTime.toIso8601String(),
-      'unread_count': unreadCount,
-      'is_online': isOnline,
-    };
   }
 }
 
 class MessageModel extends MessageEntity {
+  final String senderId;
+
   const MessageModel({
     required super.id,
     required super.text,
     required super.isMe,
     required super.time,
+    required this.senderId,
   });
 
-  factory MessageModel.fromJson(Map<String, dynamic> json) {
+  factory MessageModel.fromJson(Map<String, dynamic> json, String currentUserId) {
+    final senderId = json['sender_id'] as String;
     return MessageModel(
       id: json['id'] as String,
       text: json['text'] as String,
-      isMe: json['is_me'] as bool,
+      isMe: senderId == currentUserId,
       time: DateTime.parse(json['time'] as String),
+      senderId: senderId,
     );
   }
 
-  Map<String, dynamic> toJson(String chatId) {
+  Map<String, dynamic> toJson(String conversationId) {
     return {
-      'chat_id': chatId,
+      'conversation_id': conversationId,
+      'sender_id': senderId,
       'text': text,
-      'is_me': isMe,
       'time': time.toIso8601String(),
     };
   }
