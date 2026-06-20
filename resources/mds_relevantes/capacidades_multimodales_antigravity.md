@@ -35,6 +35,14 @@ Antigravity cuenta con soporte nativo y herramientas integradas para procesar ar
   2. Guardarla en el workspace o proporcionarla como contexto.
   3. Antigravity interpretará la interfaz visual al 100% y la traducirá a la estructura de widgets de Flutter.
 
+#### 📝 Flujo de Trabajo para Bocetos y Wireframes a Mano (Papel y Lápiz)
+Si dibujas a mano alzada el diseño o layout de tu aplicación, Antigravity puede replicarlo en código Flutter siguiendo este proceso:
+1. **Dibuja tu Layout:** Dibuja la pantalla o componente en papel, indicando la ubicación de textos, botones, inputs, iconos y la distribución deseada.
+2. **Toma una Foto:** Saca una captura o fotografía nítida del dibujo (en formatos como PNG, JPG o WEBP).
+3. **Guarda la Foto en el Workspace:** Guarda el archivo de imagen dentro de una carpeta del proyecto (por ejemplo, en `resources/dibujo_layout.jpg`).
+4. **Indica la Ruta:** Proporciona la ruta del archivo a Antigravity en tu solicitud.
+5. **Generación del Código:** El asistente analizará la imagen del boceto para identificar las filas, columnas, espaciados y componentes visuales, y los traducirá a una estructura limpia de widgets de Flutter, alineándose con tu sistema de diseño en `DESIGN_SYSTEM.md`.
+
 ### 📄 5. Documentos y PDFs
 * **Formatos soportados:** PDF, TXT, MD, CSV, JSON, etc.
 * **Capacidades:**
