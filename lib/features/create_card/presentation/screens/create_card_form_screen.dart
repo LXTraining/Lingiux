@@ -196,6 +196,7 @@ class CreateCardFormScreen extends ConsumerStatefulWidget {
       });
       // 4. Invalidar el provider de Riverpod para refrescar las listas
       ref.invalidate(wordCardsProvider);
+      ref.invalidate(userWordCardsProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
