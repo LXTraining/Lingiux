@@ -133,9 +133,41 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
         final diff = nodeA.position - nodeB.position;
         final dist = diff.distance;
-        if (dist < 1.0) continue; // Evitar división por cero
+        
+        // Si están superpuestos o extremadamente cerca, forzar una leve separación aleatoria
+        if (dist < 1.0) {
+          final random = math.Random();
+          nodeA.position += Offset(
+            (random.nextDouble() - 0.5) * 4.0,
+            (random.nextDouble() - 0.5) * 4.0,
+          );
+          continue;
+        }
 
-        final force = kr / (dist * dist);
+        // Determinar constante de repulsión dinámica según la relación de tipo de nodo
+        double currentKr = kr;
+        if (nodeA.type == 'category' && nodeB.type == 'category') {
+          currentKr = kr * 10.0; // Fuerte repulsión entre nodos madre para alejarse
+        } else if (nodeA.type == 'category' && nodeB.type == 'word') {
+          final catName = (nodeB.wordCard?.category ?? 'VOCABULARY').toUpperCase();
+          if (nodeA.id != 'cat_$catName') {
+            currentKr = kr * 4.0; // Repeler fuerte si el satélite es de otro padre
+          }
+        } else if (nodeA.type == 'word' && nodeB.type == 'category') {
+          final catName = (nodeA.wordCard?.category ?? 'VOCABULARY').toUpperCase();
+          if (nodeB.id != 'cat_$catName') {
+            currentKr = kr * 4.0; // Repeler fuerte si el satélite es de otro padre
+          }
+        }
+
+        // Calcular distancia mínima de seguridad basada en los radios visuales + holgura (10px)
+        final double radiusA = nodeA.type == 'category' ? 24.0 : 12.0;
+        final double radiusB = nodeB.type == 'category' ? 24.0 : 12.0;
+        final double minDistance = radiusA + radiusB + 10.0;
+
+        // Softening de la distancia para evitar que las fuerzas de repulsión tiendan a infinito
+        final double safeDist = math.max(dist, minDistance);
+        final force = currentKr / (safeDist * safeDist);
         fx += (diff.dx / dist) * force;
         fy += (diff.dy / dist) * force;
       }
@@ -486,59 +518,58 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           child: LayoutBuilder(
             builder: (context, constraints) {
               return InteractiveViewer(
+                constrained: false,
                 panEnabled: _panEnabled,
                 scaleEnabled: true,
                 minScale: 0.3,
                 maxScale: 2.5,
                 boundaryMargin: const EdgeInsets.all(400),
-                child: Center(
-                  child: Listener(
-                    onPointerDown: (event) {
-                      final localPos = event.localPosition;
-                      _touchStartPos = localPos;
-                      final tappedNode = _findNodeAt(localPos);
-                      if (tappedNode != null) {
-                        setState(() {
-                          _draggedNode = tappedNode;
-                          tappedNode.isDragged = true;
-                          _panEnabled = false; // Bloquear paneo global para poder arrastrar
-                        });
-                      }
-                    },
-                    onPointerMove: (event) {
-                      if (_draggedNode != null) {
-                        setState(() {
-                          _draggedNode!.position = event.localPosition;
-                          _draggedNode!.velocity = Offset.zero; // Detener inercias al arrastrar
-                        });
-                      }
-                    },
-                    onPointerUp: (event) {
-                      if (_draggedNode != null) {
-                        final node = _draggedNode!;
-                        setState(() {
-                          node.isDragged = false;
-                          _draggedNode = null;
-                          _panEnabled = true; // Liberar paneo
-                        });
+                child: Listener(
+                  onPointerDown: (event) {
+                    final localPos = event.localPosition;
+                    _touchStartPos = localPos;
+                    final tappedNode = _findNodeAt(localPos);
+                    if (tappedNode != null) {
+                      setState(() {
+                        _draggedNode = tappedNode;
+                        tappedNode.isDragged = true;
+                        _panEnabled = false; // Bloquear paneo global para poder arrastrar
+                      });
+                    }
+                  },
+                  onPointerMove: (event) {
+                    if (_draggedNode != null) {
+                      setState(() {
+                        _draggedNode!.position = event.localPosition;
+                        _draggedNode!.velocity = Offset.zero; // Detener inercias al arrastrar
+                      });
+                    }
+                  },
+                  onPointerUp: (event) {
+                    if (_draggedNode != null) {
+                      final node = _draggedNode!;
+                      setState(() {
+                        node.isDragged = false;
+                        _draggedNode = null;
+                        _panEnabled = true; // Liberar paneo
+                      });
 
-                        if (_touchStartPos != null) {
-                          final delta = (event.localPosition - _touchStartPos!).distance;
-                          if (delta < 6.0) {
-                            // Clic táctil sin arrastre
-                            _handleNodeTap(node);
-                          }
+                      if (_touchStartPos != null) {
+                        final delta = (event.localPosition - _touchStartPos!).distance;
+                        if (delta < 6.0) {
+                          // Clic táctil sin arrastre
+                          _handleNodeTap(node);
                         }
                       }
-                      _touchStartPos = null;
-                    },
-                    child: CustomPaint(
-                      size: const Size(800, 800),
-                      painter: VocabularyGraphPainter(
-                        nodes: _nodes,
-                        edges: _edges,
-                        visibleNodes: _nodes.where(_isNodeVisible).toList(),
-                      ),
+                    }
+                    _touchStartPos = null;
+                  },
+                  child: CustomPaint(
+                    size: const Size(800, 800),
+                    painter: VocabularyGraphPainter(
+                      nodes: _nodes,
+                      edges: _edges,
+                      visibleNodes: _nodes.where(_isNodeVisible).toList(),
                     ),
                   ),
                 ),

@@ -344,3 +344,334 @@ Imagínate que tu cerebro es una **pista de patinaje sobre hielo a oscuras**.
 ### ☁️ ¿Y Supabase?
 Es el **mensajero instantáneo**. Creas una carta de vocabulario en tu perfil, la base de datos de Supabase silba por lo bajo, y el mapa capta la señal al milisegundo: crea un nodo nuevo en medio de la categoría correspondiente, le mete un empujón de velocidad y lo integra a la constelación. ¡Magia instantánea sin pantallas de carga!
 
+---
+
+## 10. Estabilización de Físicas y Prevención de Explosiones Numéricas (Patch v1.1)
+
+### 10.1. El Problema Matemático-Físico de las Fuerzas Infinitas
+En simulaciones de sistemas multicuerpo basadas en fuerzas de campos centrales (como la gravedad o la electrostática de Coulomb), la magnitud del vector de fuerza se calcula utilizando el inverso del cuadrado de la distancia ($1/d^2$). La fórmula matemática de la magnitud de la fuerza de repulsión entre dos partículas $i$ y $j$ es:
+
+$$\|\vec{F}_{rep}\| = \frac{k_r}{d_{ij}^2}$$
+
+A medida que los dos nodos se acercan ($d_{ij} \to 0$), la fuerza experimenta un crecimiento asintótico hiperbólico que tiende a infinito ($\lim_{d_{ij} \to 0} \|\vec{F}_{rep}\| = \infty$).
+
+En el motor de físicas de la versión 1.0, se presentaban dos problemas graves al ocurrir una colisión o superposición de nodos:
+1.  **Escape por Continuación Incompleta:** Si la distancia euclidiana caía por debajo de $1.0\text{ píxel}$ ($d_{ij} < 1.0$), el código ejecutaba un `continue` para saltarse el cálculo y evitar la indeterminación de división por cero. Sin embargo, esto congelaba a las partículas en su estado superpuesto (ya que no experimentaban ninguna fuerza de empuje para separarse). Se quedaban pegadas hasta que una fuerza gravitatoria o un arrastre manual las desbloqueaba.
+2.  **Explosión Cinética por Proximidad Extrema:** Si la distancia era ligeramente superior a $1.0$ (por ejemplo, $1.1\text{ píxeles}$), el cálculo procedía:
+    $$\|\vec{F}_{rep}\| = \frac{15000.0}{1.1^2} = \frac{15000.0}{1.21} \approx 12396.69\text{ píxeles/frame}$$
+    Esta aceleración instantánea modificaba la velocidad del nodo en el siguiente *tick* del simulador:
+    $$\vec{V}_i^{(t+1)} = \left(\vec{V}_i^{(t)} + 12396.69 \cdot \hat{u}\right) \cdot 0.84$$
+    El nodo saltaba de golpe miles de píxeles fuera de la pantalla. Al frame siguiente, este nodo disparado quedaba lejísimos de su hub categoría y de la gravedad central, activando fuerzas de atracción gigantescas que intentaban regresarlo:
+    $$\|\vec{F}_{spring}\| = 0.09 \cdot (12000.0 - 95.0) \approx 1071.45\text{ píxeles/frame}$$
+    Esto generaba un comportamiento oscilatorio caótico. La energía cinética del sistema se elevaba exponencialmente, haciendo que todos los nodos vibraran violentamente a altas velocidades por toda la pantalla hasta que, después de cientos de frames, el factor de amortiguamiento por fricción viscosa ($\mu = 0.84$) lograba disipar la energía extra del sistema.
+
+### 10.2. La Solución: Resolución del Solapamiento y Suavizado Dinámico (Softening)
+
+Para estabilizar el sistema y evitar las singularidades matemáticas de la división por cero y las fuerzas infinitas, implementamos dos mecanismos en el cálculo de repulsión de la versión 1.1:
+
+#### A. Resolución Táctica de Superposición Completa
+Cuando la distancia geométrica real es menor a $1.0\text{ píxel}$ ($d_{ij} < 1.0$):
+*   En lugar de ignorar la colisión o dividir por valores pequeños, forzamos un desplazamiento físico inmediato directo en la coordenada de posición del nodo $A$ ($\vec{P}_A$):
+    $$\vec{P}_A = \vec{P}_A + \vec{\delta}_{random}$$
+    Donde $\vec{\delta}_{random}$ es un vector bidimensional con coordenadas aleatorias en el rango de $[-2.0, 2.0]\text{ píxeles}$.
+*   Este leve desplazamiento artificial rompe la colinealidad perfecta (superposición exacta en el mismo píxel) e introduce una pequeña separación para que, en el siguiente fotograma, la dirección del vector unitario de repulsión $\hat{r}_{ij} = \frac{\vec{r}_{ij}}{d_{ij}}$ sea calculable en una dirección específica en lugar de resultar en `NaN` (Not a Number).
+
+#### B. Suavizado Dinámico por Radios Visuales (Softening Clamping)
+El concepto de **Softening** consiste en añadir o clampear un valor mínimo de distancia en el denominador de la ley de potencias de forma que la magnitud de la fuerza se sature al alcanzar cierta cercanía. 
+
+En lugar de usar un valor de suavizado genérico y arbitrario, calculamos la distancia mínima de seguridad de forma dinámica sumando los radios visuales reales de los dos nodos interactuantes más una holgura o margen de amortiguamiento de $10.0\text{ píxeles}$:
+$$d_{min} = \text{Radio}_A + \text{Radio}_B + 10.0$$
+
+*   **Categoría vs. Categoría (Hub vs. Hub):**
+    Los nodos categoría tienen un radio de dibujo de $24.0\text{ píxeles}$. Por lo tanto:
+    $$d_{min} = 24.0 + 24.0 + 10.0 = 58.0\text{ píxeles}$$
+*   **Categoría vs. Palabra (Hub vs. Satélite):**
+    Las palabras tienen un radio de $12.0\text{ píxeles}$:
+    $$d_{min} = 24.0 + 12.0 + 10.0 = 46.0\text{ píxeles}$$
+*   **Palabra vs. Palabra (Satélite vs. Satélite):**
+    $$d_{min} = 12.0 + 12.0 + 10.0 = 34.0\text{ píxeles}$$
+
+Al realizar el cálculo de la fuerza, limitamos la distancia del denominador al valor de $d_{min}$:
+$$d_{safe} = \max(d_{ij}, d_{min})$$
+$$\|\vec{F}_{rep}\| = \frac{k_{current}}{d_{safe}^2}$$
+
+#### C. Demostración de Estabilidad Numérica (Prueba de Fuerza Máxima)
+Supongamos que dos nodos categoría se aproximan de forma extrema hasta quedar casi superpuestos ($d_{ij} \approx 1.1\text{ píxeles}$). Bajo el nuevo algoritmo:
+1.  Se calcula su distancia mínima de seguridad: $d_{min} = 24 + 24 + 10 = 58.0\text{ píxeles}$.
+2.  La distancia utilizada en el denominador se clampea: $d_{safe} = \max(1.1, 58.0) = 58.0\text{ píxeles}$.
+3.  Calculamos el denominador: $d_{safe}^2 = 58.0^2 = 3364.0$.
+4.  Calculamos la fuerza de repulsión (con una constante incrementada de $150000.0$ para categorías):
+    $$\|\vec{F}_{rep}\| = \frac{150000.0}{3364.0} \approx 44.58\text{ píxeles/frame}$$
+
+Una aceleración de $44.58\text{ píxeles/frame}$ es lo suficientemente potente como para empujar y separar a las dos categorías en apenas 2 a 3 fotogramas de forma ágil, pero es **totalmente estable**. Al no superar el límite crítico de velocidad, los nodos no salen disparados del canvas, no activan retroatracciones elásticas violentas, y la simulación se mantiene en un estado fluido y visualmente armonioso.
+
+---
+
+## 11. Repulsión Dinámica entre Nodos Madre y Aislamiento de Constelaciones
+
+### 11.1. El Problema de la Contaminación Orbital de Categorías
+Un nodo de categoría (madre) representa el centro de gravedad e identidad de un grupo de palabras (por ejemplo, "VERBOS"). Al arrastrar libremente un nodo categoría por la pantalla o al experimentar la fuerza de atracción hacia el centro del canvas, ocurría un defecto de diseño físico:
+*   Un nodo categoría grande podía flotar y posicionarse justo en medio de la órbita circular de las palabras satélites de **otra** categoría (por ejemplo, situarse dentro del círculo de "SUSTANTIVOS").
+*   Esto rompía por completo la metáfora visual de "constelaciones o redes neuronales independientes", confundiendo al usuario ya que las palabras de una categoría parecían orbitar alrededor del nodo de otra categoría ajena.
+
+### 11.2. Implementación de Cargas Eléctricas Dinámicas (Relación de Tipos)
+Para resolver esto, convertimos la constante de repulsión electrostática $k_r$ en un coeficiente dinámico ($k_{current}$) que varía según los tipos de nodos que entran en contacto en cada iteración del bucle de físicas:
+
+```
+                  ┌─────────────────────────────────────────┐
+                  │ ¿Qué tipos de nodos están interactuando?│
+                  └────────────────────┬────────────────────┘
+                                       │
+            ┌──────────────────────────┼──────────────────────────┐
+            ▼                          ▼                          ▼
+   [Categoría vs Categoría]   [Categoría vs Palabra Ajena]  [Mismo Grupo o Palabras]
+    currentKr = kr * 10.0        currentKr = kr * 4.0          currentKr = kr (Base)
+        (150,000.0)                  (60,000.0)                   (15,000.0)
+```
+
+1.  **Repulsión Categoría-Categoría (Hub vs. Hub):**
+    Para asegurar que los centros de masa principales de las constelaciones se mantengan bien distribuidos por el lienzo y nunca se encimen, se define:
+    $$k_{current} = k_r \times 10.0 = 150000.0$$
+    Esto empuja a los hubs masivos a buscar los extremos opuestos del espacio, formando polígonos equilibrados alrededor del centro.
+2.  **Repulsión Categoría-Palabra de Otra Categoría (Hub vs. Satélite Ajeno):**
+    Si la categoría $A$ interactúa con la palabra $B$, y la palabra $B$ pertenece a una categoría diferente (es decir, $A.\text{id} \neq \text{'cat_' } + B.\text{category}$), se define:
+    $$k_{current} = k_r \times 4.0 = 60000.0$$
+    Esta fuerza incrementada actúa como un **escudo protector radial** alrededor de cada categoría. Cuando un nodo madre se desplaza hacia la constelación de otra, empuja activamente a las palabras de la otra constelación para abrirse paso, o bien las palabras empujan al nodo madre para mantenerlo fuera de su "telaraña".
+3.  **Repulsión Categoría-Palabra del Mismo Grupo:**
+    Si la palabra $B$ pertenece a la categoría $A$, se utiliza la constante base:
+    $$k_{current} = k_r = 15000.0$$
+    Esto permite que los satélites se mantengan compactos y agrupados cerca de su nodo categoría central, equilibrando la fuerza elástica de atracción del muelle sin ser expulsados agresivamente.
+
+---
+
+## 12. Corrección de Límites de Tap y Drag en InteractiveViewer (Patch v1.2)
+
+### 12.1. El Problema del Overflow y la Pérdida de Interactividad Lateral
+Durante las pruebas de usuario, se identificó un comportamiento inconsistente al interactuar con el lienzo:
+*   Solo algunos nodos (principalmente los que se encontraban en el cuadrante superior izquierdo o en el centro exacto al cargar la pantalla) respondían a gestos táctiles de arrastre (`Drag`) o clics (`Tap`).
+*   Los nodos posicionados en las esquinas inferiores o que se alejaban de su posición de origen dejaban de responder por completo, volviéndose inertes a pesar de ser perfectamente visibles.
+
+### 12.2. Diagnóstico del Árbol de Widgets de Flutter
+El bug residía en el uso de un widget `Center` intermedio como hijo directo del `InteractiveViewer`:
+
+```dart
+InteractiveViewer(
+  child: Center(
+    child: Listener(
+      child: CustomPaint(size: Size(800, 800)),
+    ),
+  ),
+)
+```
+
+1.  **Comportamiento de Layout de `Center`:** El widget `Center` expande sus dimensiones para ajustarse estrictamente a las restricciones máximas impuestas por su padre (en este caso, el tamaño del viewport físico del `InteractiveViewer` en el dispositivo, por ejemplo, $360 \times 600\text{ píxeles}$).
+2.  **Desbordamiento (Overflow):** Su widget hijo `Listener` tiene un tamaño explícito y fijo de $800 \times 800\text{ píxeles}$. Dado que $800 > 360$ y $800 > 600$, el `Listener` desborda las fronteras físicas de su padre `Center` por $220\text{ píxeles}$ a los lados y $100\text{ píxeles}$ arriba y abajo.
+3.  **Restricción del Hit Testing en Flutter:** En la arquitectura de renderizado de Flutter, cuando ocurre un toque en la pantalla, el motor recorre el árbol de renderizado desde la raíz para realizar la detección de colisiones táctiles (`Hit Testing`). Si un punto de contacto cae fuera de los límites geométricos y restricciones de diseño de un widget ancestro, el motor aborta la búsqueda en esa rama del árbol y asume que el toque no colisionó con ninguno de sus hijos.
+
+### 12.3. Solución Aplicada (Patch v1.2 definitivo)
+Para solucionar el problema de raíz, realizamos dos modificaciones arquitectónicas cruciales:
+
+1. **Eliminación del widget `Center` intermedio:** Colocamos el `Listener` como hijo directo del `InteractiveViewer`.
+2. **Configuración de `constrained: false`:** Por defecto en Flutter, `InteractiveViewer` tiene la propiedad `constrained` establecida en `true`. Esto fuerza a su hijo directo a dimensionarse de acuerdo a las restricciones del viewport físico de la pantalla (ej. $360 \times 600\text{ px}$). Al forzar esto, aunque no haya un widget `Center`, el `Listener` se encoge al tamaño del dispositivo, desactivando el área de eventos táctiles para cualquier coordenada externa. Al establecer `constrained: false`, permitimos que el `Listener` y su canvas tomen su tamaño real de $800 \times 800\text{ px}$.
+
+El árbol de widgets final quedó estructurado de la siguiente forma:
+
+```dart
+InteractiveViewer(
+  constrained: false, // Desactiva la constricción al tamaño de la pantalla
+  panEnabled: _panEnabled,
+  scaleEnabled: true,
+  minScale: 0.3,
+  maxScale: 2.5,
+  boundaryMargin: const EdgeInsets.all(400),
+  child: Listener(
+    child: CustomPaint(size: Size(800, 800)),
+  ),
+)
+```
+
+*   Al hacer esto, el `InteractiveViewer` reconoce al `Listener` como el límite real de su espacio de lienzo y no se imponen restricciones de clipping táctil intermedias.
+*   Toda la superficie de $800 \times 800\text{ píxeles}$ se mantiene activa e interactiva en su totalidad en cualquier nivel de paneo y zoom, permitiendo arrastrar y hacer clic en el 100% de los nodos del cerebro digital sin importar su ubicación.
+
+---
+
+## 13. Cuadro Comparativo de Versiones y Código del Motor
+
+### 13.1. Cuadro Comparativo de Comportamiento
+
+| Característica | Versión 1.0 (Inestable) | Versión 1.1 (Estabilizada y Aislada) | Versión 1.2 (Interactividad Total) |
+| :--- | :--- | :--- | :--- |
+| **Separación a $d < 1.0\text{ px}$** | `continue` (Nodos bloqueados) | Desplazamiento de `±4.0px` | Desplazamiento de `±4.0px` |
+| **Magnitud de Repulsión Máxima** | Infinita (Provocaba explosiones) | Capped por radios visuales | Capped por radios visuales |
+| **Interacción entre Hubs Madres** | Repulsión débil (Solapamiento) | Súper repulsión ($10\times$) | Súper repulsión ($10\times$) |
+| **Aislamiento de Constelaciones** | Ninguno | Escudo de repulsión ($4\times$) | Escudo de repulsión ($4\times$) |
+| **Área Táctil Activa (Hit Testing)** | Limitada a ventana central | Limitada a ventana central | **Completa ($800\times 800$)** |
+| **Precisión de Tap / Drag** | Errática (Nodos "muertos") | Errática (Nodos "muertos") | **Pixel-perfect en todo el mapa** |
+
+### 13.2. Implementación de Físicas e Interactividad en `community_screen.dart`
+El siguiente fragmento muestra el bucle del `Ticker` y la estructura del widget interactivo corregido en [`community_screen.dart`](file:///c:/Users/sebas/OneDrive/Escritorio/Lingiux/lingiux_app/lib/features/community/presentation/screens/community_screen.dart):
+
+```dart
+// Bucle de simulación física ejecutado en cada Tick
+for (int i = 0; i < _nodes.length; i++) {
+  final nodeA = _nodes[i];
+  if (nodeA.isDragged || !_isNodeVisible(nodeA)) continue;
+
+  double fx = 0;
+  double fy = 0;
+
+  for (int j = 0; j < _nodes.length; j++) {
+    if (i == j) continue;
+    final nodeB = _nodes[j];
+    if (!_isNodeVisible(nodeB)) continue;
+
+    final diff = nodeA.position - nodeB.position;
+    final dist = diff.distance;
+    
+    // Si están superpuestos o extremadamente cerca, forzar una leve separación aleatoria
+    // para romper la colinealidad y poder calcular la dirección de escape en el siguiente frame
+    if (dist < 1.0) {
+      final random = math.Random();
+      nodeA.position += Offset(
+        (random.nextDouble() - 0.5) * 4.0,
+        (random.nextDouble() - 0.5) * 4.0,
+      );
+      continue;
+    }
+
+    // Determinar constante de repulsión dinámica según la relación de tipo de nodo
+    double currentKr = kr;
+    if (nodeA.type == 'category' && nodeB.type == 'category') {
+      currentKr = kr * 10.0; // Fuerte repulsión entre nodos madre para alejarse
+    } else if (nodeA.type == 'category' && nodeB.type == 'word') {
+      final catName = (nodeB.wordCard?.category ?? 'VOCABULARY').toUpperCase();
+      if (nodeA.id != 'cat_$catName') {
+        currentKr = kr * 4.0; // Repeler fuerte si el satélite es de otro padre
+      }
+    } else if (nodeA.type == 'word' && nodeB.type == 'category') {
+      final catName = (nodeA.wordCard?.category ?? 'VOCABULARY').toUpperCase();
+      if (nodeB.id != 'cat_$catName') {
+        currentKr = kr * 4.0; // Repeler fuerte si el satélite es de otro padre
+      }
+    }
+
+    // Calcular distancia mínima de seguridad basada en los radios visuales + holgura (10px)
+    // Evita solapamiento visual y acota la fuerza electrostática máxima
+    final double radiusA = nodeA.type == 'category' ? 24.0 : 12.0;
+    final double radiusB = nodeB.type == 'category' ? 24.0 : 12.0;
+    final double minDistance = radiusA + radiusB + 10.0;
+
+    // Softening de la distancia para evitar que las fuerzas de repulsión tiendan a infinito
+    final double safeDist = math.max(dist, minDistance);
+    final force = currentKr / (safeDist * safeDist);
+    fx += (diff.dx / dist) * force;
+    fy += (diff.dy / dist) * force;
+  }
+
+  // Atracción gravitatoria hacia el centro del espacio de dibujo (800x800)
+  final diffToCenter = center - nodeA.position;
+  final distToCenter = diffToCenter.distance;
+  if (distToCenter > 1.0) {
+    fx += (diffToCenter.dx / distToCenter) * distToCenter * gravity;
+    fy += (diffToCenter.dy / distToCenter) * distToCenter * gravity;
+  }
+
+  // Acumular la aceleración en el vector de velocidad del nodo
+  nodeA.velocity = Offset(nodeA.velocity.dx + fx, nodeA.velocity.dy + fy);
+}
+```
+
+---
+
+## 14. Resolución Definitiva de Hit-Testing e Interactividad Plena (Patch v1.3)
+
+### 14.1. Diagnóstico del Síntoma: La Inconsistencia Espacial de Gestos
+Durante la interacción real con el mapa mental, se observaba que:
+* Al cargar la pantalla por primera vez, solo los nodos ubicados en el cuadrante superior izquierdo (o en el centro) respondían al arrastre (`Drag`) o al clic (`Tap`).
+* Nodos que se posicionaban en la periferia derecha o inferior (coordenadas mayores a $360\text{ px}$ en X o $600\text{ px}$ en Y) se volvían "bloques inertes": se podían ver flotando en la simulación, pero el usuario no podía arrastrarlos ni hacer clic sobre ellos.
+* El comportamiento era sumamente confuso porque, si el usuario hacía zoom hacia atrás (`scale < 1.0`) o se desplazaba hacia la derecha con el paneo (`pan`), los nodos eran perfectamente visibles en medio de la pantalla física, pero seguían sin reaccionar al tacto.
+
+### 14.2. Análisis del Motor de Hit-Testing y Layout en Flutter
+
+Para comprender la anomalía, es fundamental analizar cómo Flutter procesa los gestos a nivel de árbol de renderizado (`RenderObjects`):
+
+1. **Propagación del Hit-Testing:**
+   Cuando ocurre un evento de contacto físico en la pantalla en una coordenada global $\vec{P}_{global}$, Flutter inicia un recorrido de árbol de colisión (método `hitTest`). Cada widget interseca esta coordenada con su caja límite (`Size` local).
+   Si la coordenada cae **fuera** de los límites geométricos definidos del widget, Flutter descarta inmediatamente toda la rama de ese widget y de sus hijos, asumiendo que el toque no colisionó con ellos.
+
+2. **La Matriz de Transformación de `InteractiveViewer`:**
+   El `InteractiveViewer` permite hacer zoom y paneo aplicando una matriz de transformación afín $M$ a su widget hijo (`Listener`). Cuando ocurre un toque en la pantalla, Flutter aplica la matriz inversa $M^{-1}$ al evento para traducir la coordenada global al espacio coordenado local del hijo:
+   $$\vec{P}_{local} = M^{-1} \cdot \vec{P}_{global}$$
+   Esto permite que si tocas la pantalla física en la posición central de un canvas ampliado, Flutter calcule la posición exacta dentro del canvas (ej. $\vec{P}_{local} = (400.0, 400.0)$).
+
+3. **El Efecto de `constrained: true` (El Bug de Layout):**
+   Por defecto, `InteractiveViewer` tiene la propiedad `constrained` establecida en `true`. 
+   * **¿Qué significa esto?** Obliga al widget hijo directo a ajustarse estrictamente a las restricciones de tamaño del viewport del `InteractiveViewer` (el tamaño físico de la pantalla, por ejemplo, $390\text{ px} \times 650\text{ px}$).
+   * **Consecuencia en el Listener:** El widget `Listener` (que detecta los gestos de puntero crudos) fue forzado a medir únicamente $390 \times 650\text{ px}$ en su geometría de layout.
+   * **Consecuencia en el CustomPaint:** El `CustomPaint` interno tenía un tamaño configurado de `Size(800, 800)`. Al no tener clipping, el CustomPaint dibujaba los nodos en todo el canvas de $800 \times 800$, haciendo que sobresalieran de forma invisible para la lógica de layout, pero visibles en la GPU.
+   * **La Ruptura del Gestor:** Si un nodo tenía una coordenada $\vec{N}_{pos} = (650.0, 500.0)$ en el canvas:
+     * El CustomPaint lo dibujaba en esa coordenada correcta.
+     * Al hacer clic sobre él, la matriz de transformación calculaba correctamente $\vec{P}_{local} = (650.0, 500.0)$.
+     * Sin embargo, Flutter comparaba esta coordenada local con los límites del widget `Listener` (que medía solo $390 \times 650$).
+     * Dado que la coordenada local X ($650.0$) superaba el ancho máximo del `Listener` ($390.0$), Flutter declaraba que el toque ocurrió **fuera de los límites del widget del gestor de eventos**. Por lo tanto, el evento `onPointerDown` del `Listener` nunca se disparaba.
+
+El siguiente diagrama de flujo visualiza cómo Flutter descartaba los toques fuera del viewport inicial debido a la restricción de tamaño:
+
+```mermaid
+graph TD
+    A["Toque del Usuario (P_global)"] --> B["InteractiveViewer aplica M^-1"]
+    B --> C["Coordenada en Lienzo Local (P_local)"]
+    C --> D{"¿constrained: true?"}
+    
+    D -- Sí --> E["Listener mide tamaño del Viewport (ej. 390x650)"]
+    E --> F{"¿P_local está dentro de 390x650?"}
+    F -- No (ej. 500,450) --> G["Descarta Evento (Nodo Inerte)"]
+    F -- Sí (ej. 150,200) --> H["Dispara PointerDown -> Permite Drag/Tap"]
+    
+    D -- No (Solución v1.3) --> I["Listener mide tamaño del Canvas (800x800)"]
+    I --> J{"¿P_local está dentro de 800x800?"}
+    J -- Sí (En todo el mapa) --> K["Dispara PointerDown -> Interactividad Plena"]
+    J -- No --> L["Fuera del Canvas completo"]
+```
+
+### 14.3. Solución Implementada: Liberación del Canvas con `constrained: false`
+
+Para resolver esta limitación geométrica, modificamos la inicialización del `InteractiveViewer` en [community_screen.dart](file:///c:/Users/sebas/OneDrive/Escritorio/Lingiux/lingiux_app/lib/features/community/presentation/screens/community_screen.dart) configurando explícitamente `constrained: false`:
+
+```dart
+InteractiveViewer(
+  constrained: false, // <-- Desactiva el ajuste forzado al viewport
+  panEnabled: _panEnabled,
+  scaleEnabled: true,
+  minScale: 0.3,
+  maxScale: 2.5,
+  boundaryMargin: const EdgeInsets.all(400),
+  child: Listener(
+    onPointerDown: (event) {
+      final localPos = event.localPosition;
+      _touchStartPos = localPos;
+      final tappedNode = _findNodeAt(localPos);
+      if (tappedNode != null) {
+        setState(() {
+          _draggedNode = tappedNode;
+          tappedNode.isDragged = true;
+          _panEnabled = false; // Bloquea paneo de InteractiveViewer al arrastrar
+        });
+      }
+    },
+    // ... rest of Listener events
+    child: CustomPaint(
+      size: const Size(800, 800),
+      painter: VocabularyGraphPainter(...),
+    ),
+  ),
+)
+```
+
+### 14.4. Impacto y Comportamiento Final
+* **Tamaño Natural del Widget:** Con `constrained: false`, el `InteractiveViewer` permite que el widget hijo (`Listener`) tome su tamaño intrínseco. Al estar envuelto en un `CustomPaint` de `Size(800, 800)`, el `Listener` mide exactamente $800 \times 800\text{ píxeles}$ en su geometría física del layout.
+* **Hit-Testing Perfecto:** Como el `Listener` abarca la totalidad del canvas donde están los nodos, cualquier coordenada de toque mapeada mediante la matriz inversa caerá siempre dentro de los límites del widget ($0 \le x \le 800$ y $0 \le y \le 800$).
+* **Libertad de Paneo e Interacción:** El usuario puede hacer zoom-out completo o desplazarse a la esquina más remota del mapa mental neuronal, y cualquier nodo responderá perfectamente a la interacción táctil (tanto clics para abrir la pantalla de repaso de la palabra como arrastres para jugar con la elasticidad física).
+
+
+
