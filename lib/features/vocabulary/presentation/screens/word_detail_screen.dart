@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/word_card_model.dart';
 import '../providers/vocabulary_provider.dart';
+import '../../../profile/presentation/providers/settings_provider.dart';
 
 class WordDetailScreen extends ConsumerStatefulWidget {
   final String selectedWord;
@@ -23,6 +24,22 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   final AudioPlayer _networkPlayer = AudioPlayer();
   String? _playingAudioUrl;
   bool _isPlaying = false;
+  bool _hasPlayedInitialAudio = false;
+
+  Future<void> _playAudio(String? url) async {
+    if (url == null || url.isEmpty) return;
+
+    try {
+      await _networkPlayer.stop();
+      setState(() {
+        _playingAudioUrl = url;
+        _isPlaying = true;
+      });
+      await _networkPlayer.play(UrlSource(url));
+    } catch (e) {
+      debugPrint('Error al reproducir audio automáticamente: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -162,6 +179,17 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
             sortedWords.addAll(wordCards);
           }
 
+          // Reproducción automática de la primera carta en la primera carga si está activa
+          if (!_hasPlayedInitialAudio) {
+            _hasPlayedInitialAudio = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              final autoPlay = ref.read(settingsProvider).autoPlayAudio;
+              if (autoPlay && sortedWords.isNotEmpty) {
+                _playAudio(sortedWords[0].audioUrl);
+              }
+            });
+          }
+
           return Column(
             children: [
               Padding(
@@ -208,6 +236,13 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       _isPlaying = false;
                       _playingAudioUrl = null;
                     });
+
+                    final autoPlay = ref.read(settingsProvider).autoPlayAudio;
+                    final wordIndex = index % sortedWords.length;
+                    final card = sortedWords[wordIndex];
+                    if (autoPlay && card.audioUrl != null && card.audioUrl!.isNotEmpty) {
+                      _playAudio(card.audioUrl);
+                    }
                   },
                   itemBuilder: (context, index) {
                     final wordIndex = index % sortedWords.length;

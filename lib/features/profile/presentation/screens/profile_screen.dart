@@ -8,98 +8,12 @@ import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../providers/profile_provider.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  void _showSettingsBottomSheet(BuildContext context, WidgetRef ref) {
-    HapticFeedback.mediumImpact();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 12),
-                // Barra de arrastre superior
-                Container(
-                  width: 48,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Ajustes de Cuenta',
-                        style: TextStyle(
-                          color: AppColors.onSurface,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.edit_outlined, color: AppColors.onSurface),
-                  title: const Text('Editar Perfil'),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.notifications_none_rounded, color: AppColors.onSurface),
-                  title: const Text('Notificaciones'),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.help_outline_rounded, color: AppColors.onSurface),
-                  title: const Text('Ayuda y Soporte'),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                const Divider(color: AppColors.border),
-                ListTile(
-                  leading: const Icon(Icons.logout_rounded, color: AppColors.error),
-                  title: const Text(
-                    'Cerrar sesión',
-                    style: TextStyle(
-                      color: AppColors.error,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onTap: () async {
-                    HapticFeedback.lightImpact();
-                    Navigator.pop(context); // Cierra bottom sheet
-                    await ref.read(authProvider.notifier).signOut();
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -165,7 +79,13 @@ class ProfileScreen extends ConsumerWidget {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.settings_outlined, color: AppColors.onSurface),
-                  onPressed: () => _showSettingsBottomSheet(context, ref),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    );
+                  },
                 ),
               ],
             ),
@@ -365,7 +285,13 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         GestureDetector(
-                          onTap: () => _showSettingsBottomSheet(context, ref),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                            );
+                          },
                           child: Container(
                             decoration: BoxDecoration(
                               color: AppColors.surface,
