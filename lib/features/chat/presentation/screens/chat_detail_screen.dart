@@ -27,10 +27,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   OverlayEntry? _overlayEntry;
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
   }
 
   @override
@@ -38,6 +40,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     _overlayEntry?.remove();
     _controller.dispose();
     _scrollController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -180,75 +183,273 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _dismissOverlay,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Row(
+      child: PageView(
+        controller: _pageController,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          _buildConversationPage(context),
+          _buildInfoPage(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConversationPage(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            _Avatar(
+              initials: widget.chat.initials,
+              colorIndex: widget.chat.avatarColorIndex,
+              size: 34,
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.chat.name,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (widget.chat.isOnline)
+                  const Text(
+                    'en línea',
+                    style: TextStyle(color: AppColors.online, fontSize: 11),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined),
+            onPressed: () {},
+          ),
+          IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.info_outline_rounded),
+            onPressed: () {
+              _pageController.animateToPage(
+                1,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ref.watch(messagesProvider(widget.chat.id)).when(
+              data: (messages) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients) {
+                    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                  }
+                });
+                if (messages.isEmpty) {
+                  return const Center(child: Text('No hay mensajes aún. ¡Comienza a chatear!'));
+                }
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) => MessageBubble(
+                    message: messages[index],
+                    onWordTap: _showWordCard,
+                  ),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              error: (error, stack) => Center(child: Text('Error al cargar mensajes: $error')),
+            ),
+          ),
+          _InputBar(controller: _controller, onSend: _sendMessage),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoPage(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () {
+            _pageController.animateToPage(
+              0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          },
+        ),
+        title: const Text('Detalles del Chat'),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _Avatar(
-                initials: widget.chat.initials,
-                colorIndex: widget.chat.avatarColorIndex,
-                size: 34,
+              const SizedBox(height: 20),
+              // Big Avatar
+              Hero(
+                tag: 'chat_avatar_${widget.chat.id}',
+                child: _Avatar(
+                  initials: widget.chat.initials,
+                  colorIndex: widget.chat.avatarColorIndex,
+                  size: 96,
+                ),
               ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 24),
+              // Chat Name
+              Text(
+                widget.chat.name,
+                style: const TextStyle(
+                  color: AppColors.onSurface,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Online / Offline Status Tag
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: widget.chat.isOnline
+                      ? AppColors.online.withValues(alpha: 0.1)
+                      : AppColors.onSurfaceMuted.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: widget.chat.isOnline ? AppColors.online : AppColors.onSurfaceMuted,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.chat.isOnline ? 'En línea' : 'Desconectado',
+                      style: TextStyle(
+                        color: widget.chat.isOnline ? AppColors.online : AppColors.onSurfaceMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 48),
+              // Premium Placeholder Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF815BF5).withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.insights_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Próximamente',
+                      style: TextStyle(
+                        color: AppColors.onSurface,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Aquí encontrarás estadísticas de conversación, vocabulario aprendido en común y opciones de personalización.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.onSurfaceMuted,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+              // Back hint
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  Icon(
+                    Icons.arrow_back_rounded,
+                    size: 16,
+                    color: AppColors.onSurfaceMuted.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
-                    widget.chat.name,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                    'Desliza a la derecha para volver al chat',
+                    style: TextStyle(
+                      color: AppColors.onSurfaceMuted.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (widget.chat.isOnline)
-                    const Text(
-                      'en línea',
-                      style: TextStyle(color: AppColors.online, fontSize: 11),
-                    ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.swipe_left_alt_rounded,
+                    size: 16,
+                    color: AppColors.onSurfaceMuted.withValues(alpha: 0.6),
+                  ),
                 ],
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.videocam_outlined),
-              onPressed: () {},
-            ),
-            IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
-          ],
-        ),
-        body: Column(
-          children: [
-            Expanded(
-              child: ref.watch(messagesProvider(widget.chat.id)).when(
-                data: (messages) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (_scrollController.hasClients) {
-                      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-                    }
-                  });
-                  if (messages.isEmpty) {
-                    return const Center(child: Text('No hay mensajes aún. ¡Comienza a chatear!'));
-                  }
-                  return ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) => MessageBubble(
-                      message: messages[index],
-                      onWordTap: _showWordCard,
-                    ),
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-                error: (error, stack) => Center(child: Text('Error al cargar mensajes: $error')),
-              ),
-            ),
-            _InputBar(controller: _controller, onSend: _sendMessage),
-          ],
         ),
       ),
     );
