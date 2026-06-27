@@ -10,6 +10,7 @@ class WordCardModel {
   final String? language;
   final String? audioUrl;
   final String? userId;
+  final Map<String, dynamic>? canvasDesign;
 
   const WordCardModel({
     required this.id,
@@ -23,6 +24,7 @@ class WordCardModel {
     this.language,
     this.audioUrl,
     this.userId,
+    this.canvasDesign,
   });
 
   factory WordCardModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,9 @@ class WordCardModel {
       language: json['language'] as String?,
       audioUrl: json['audio_url'] as String?,
       userId: json['user_id'] as String?,
+      canvasDesign: json['canvas_design'] is Map
+          ? Map<String, dynamic>.from(json['canvas_design'] as Map)
+          : null,
     );
   }
 
@@ -54,6 +59,7 @@ class WordCardModel {
       'language': language,
       'audio_url': audioUrl,
       'user_id': userId,
+      'canvas_design': canvasDesign,
     };
   }
 }

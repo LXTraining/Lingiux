@@ -288,28 +288,117 @@ class _WordCard extends StatelessWidget {
     [Color(0xFF1D4ED8), Color(0xFF059669)],
   ];
 
+  Widget _buildFrameDecoration(String type, Widget child, Color fallbackColor) {
+    if (type == 'normal') {
+      return child;
+    }
+
+    Color frameColor;
+    Color glowColor;
+    double borderWidth = 6.0;
+    List<BoxShadow> shadows = [];
+
+    switch (type) {
+      case 'bronce':
+        frameColor = const Color(0xFFCD7F32);
+        glowColor = const Color(0xFF8B5A2B);
+        shadows = [
+          BoxShadow(
+            color: glowColor.withOpacity(0.35),
+            blurRadius: 10,
+            spreadRadius: 1,
+          )
+        ];
+        break;
+      case 'plata':
+        frameColor = const Color(0xFFE0E0E0);
+        glowColor = const Color(0xFF9E9E9E);
+        shadows = [
+          BoxShadow(
+            color: glowColor.withOpacity(0.4),
+            blurRadius: 12,
+            spreadRadius: 1.5,
+          )
+        ];
+        break;
+      case 'oro':
+        frameColor = const Color(0xFFFFD700);
+        glowColor = const Color(0xFFDAA520);
+        shadows = [
+          BoxShadow(
+            color: glowColor.withOpacity(0.55),
+            blurRadius: 16,
+            spreadRadius: 2.5,
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.3),
+            blurRadius: 4,
+            spreadRadius: 0.5,
+          ),
+        ];
+        break;
+      case 'neon':
+        frameColor = const Color(0xFFEC4899);
+        glowColor = const Color(0xFFEC4899);
+        shadows = [
+          BoxShadow(
+            color: glowColor.withOpacity(0.6),
+            blurRadius: 18,
+            spreadRadius: 3.5,
+          ),
+        ];
+        borderWidth = 5.0;
+        break;
+      default:
+        return child;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: frameColor, width: borderWidth),
+        boxShadow: shadows,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final gradient = _gradients[gradientIndex % _gradients.length];
+    int gradIdx = gradientIndex;
+    if (wordCard.canvasDesign != null && wordCard.canvasDesign!['gradient_index'] != null) {
+      final rawIndex = wordCard.canvasDesign!['gradient_index'];
+      if (rawIndex is num) {
+        gradIdx = rawIndex.toInt();
+      }
+    }
+    final gradient = _gradients[gradIdx % _gradients.length];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: gradient,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
+    String frameType = 'normal';
+    if (wordCard.canvasDesign != null && wordCard.canvasDesign!['frame_type'] != null) {
+      frameType = wordCard.canvasDesign!['frame_type'] as String;
+    }
+
+    final cardBody = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          if (frameType == 'normal')
             BoxShadow(
               color: gradient[0].withOpacity(0.35),
               blurRadius: 28,
               offset: const Offset(0, 10),
             ),
-          ],
-        ),
+        ],
+      ),
         child: Stack(
           children: [
             // Círculos de diseño abstractos y sutiles en el fondo
@@ -548,6 +637,14 @@ class _WordCard extends StatelessWidget {
             ),
           ],
         ),
+      );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: _buildFrameDecoration(
+        frameType,
+        cardBody,
+        gradient[0],
       ),
     );
   }

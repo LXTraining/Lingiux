@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../feed/presentation/screens/feed_screen.dart';
 import '../../../chat/presentation/screens/chats_list_screen.dart';
 import '../../../create_card/presentation/screens/create_card_screen.dart';
@@ -6,30 +7,26 @@ import '../../../community/presentation/screens/community_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../providers/navigation_provider.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedIndex = ref.watch(activeTabProvider);
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
     final screens = [
       const FeedScreen(),
       const ChatsListScreen(),
-      CreateCardScreen(isActive: _selectedIndex == 2),
+      CreateCardScreen(isActive: selectedIndex == 2),
       const CommunityScreen(),
       const ProfileScreen(),
     ];
 
     return Scaffold(
       body: IndexedStack(
-        index: _selectedIndex,
+        index: selectedIndex,
         children: screens,
       ),
       bottomNavigationBar: Container(
@@ -49,22 +46,24 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, AppStrings.navInicio),
-            _buildNavItem(1, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, AppStrings.navChats),
-            _buildNavItem(2, Icons.add_circle_outline_rounded, Icons.add_circle_rounded, AppStrings.navCrear),
-            _buildNavItem(3, Icons.people_outline_rounded, Icons.people_rounded, AppStrings.navComunidad),
-            _buildNavItem(4, Icons.person_outline_rounded, Icons.person_rounded, AppStrings.navPerfil),
+            _buildNavItem(context, ref, 0, Icons.home_outlined, Icons.home_rounded, AppStrings.navInicio, selectedIndex),
+            _buildNavItem(context, ref, 1, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, AppStrings.navChats, selectedIndex),
+            _buildNavItem(context, ref, 2, Icons.add_circle_outline_rounded, Icons.add_circle_rounded, AppStrings.navCrear, selectedIndex),
+            _buildNavItem(context, ref, 3, Icons.people_outline_rounded, Icons.people_rounded, AppStrings.navComunidad, selectedIndex),
+            _buildNavItem(context, ref, 4, Icons.person_outline_rounded, Icons.person_rounded, AppStrings.navPerfil, selectedIndex),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData outlineIcon, IconData solidIcon, String label) {
-    final isSelected = _selectedIndex == index;
+  Widget _buildNavItem(BuildContext context, WidgetRef ref, int index, IconData outlineIcon, IconData solidIcon, String label, int selectedIndex) {
+    final isSelected = selectedIndex == index;
 
     return GestureDetector(
-      onTap: () => setState(() => _selectedIndex = index),
+      onTap: () {
+        ref.read(activeTabProvider.notifier).state = index;
+      },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
