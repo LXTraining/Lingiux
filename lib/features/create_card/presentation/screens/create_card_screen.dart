@@ -208,6 +208,15 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Escuchar si hay una palabra pendiente de precargar desde el chat
+    ref.listen<String?>(pendingWordProvider, (previous, next) {
+      if (next != null && next.trim().isNotEmpty) {
+        _wordController.text = next.trim();
+        // Limpiamos el estado pendiente para no ciclar
+        ref.read(pendingWordProvider.notifier).state = null;
+      }
+    });
+
     return Container(
       color: AppColors.background,
       child: Stack(
@@ -234,138 +243,126 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
           ),
           Scaffold(
             backgroundColor: Colors.transparent,
-            appBar: AppBar(
-              title: const Text(
-                'crear_tarjeta',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  fontFamily: 'Inter',
-                ),
-              ),
-              elevation: 0,
-              backgroundColor: Colors.transparent,
-              centerTitle: true,
-            ),
-            body: Column(
-              children: [
-                const SizedBox(height: 10),
-                // 1. BARRA DE PROGRESO DEL STEPPER
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _getStepTitle(_currentStep),
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              fontFamily: 'Inter',
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            'Paso ${_currentStep + 1} de 4',
-                            style: const TextStyle(
-                              color: AppColors.onSurfaceMuted,
-                              fontSize: 11,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Barra de progreso lineal animada
-                      Stack(
-                        children: [
-                          Container(
-                            height: 4,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: AppColors.border.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
-                            height: 4,
-                            width: MediaQuery.of(context).size.width *
-                                0.88 *
-                                ((_currentStep + 1) / 4),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+            body: SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  // 1. BARRA DE PROGRESO DEL STEPPER (Hasta arriba y más gruesa)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _getStepTitle(_currentStep),
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                fontFamily: 'Inter',
+                                letterSpacing: 1.0,
                               ),
-                              borderRadius: BorderRadius.circular(2),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            Text(
+                              'Paso ${_currentStep + 1} de 4',
+                              style: const TextStyle(
+                                color: AppColors.onSurfaceMuted,
+                                fontSize: 11,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        // Barra de progreso lineal animada (Más gruesa)
+                        Stack(
+                          children: [
+                            Container(
+                              height: 8,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: AppColors.border.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              height: 8,
+                              width: MediaQuery.of(context).size.width *
+                                  0.88 *
+                                  ((_currentStep + 1) / 4),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
+                  const SizedBox(height: 14),
 
-                // 2. PAGEVIEW CON LOS PASOS DEL ASISTENTE
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(), // Bloquear swipe manual
-                    children: [
-                      StepWordIdentity(
-                        wordController: _wordController,
-                        phoneticController: _phoneticController,
-                        selectedCategory: _selectedCategory,
-                        onCategoryChanged: (val) {
-                          if (val != null) setState(() => _selectedCategory = val);
-                        },
-                        selectedLanguage: _selectedLanguage,
-                        onLanguageChanged: (val) {
-                          if (val != null) setState(() => _selectedLanguage = val);
-                        },
-                        recordedAudioPath: _recordedAudioPath,
-                        onAudioRecorded: (val) => setState(() => _recordedAudioPath = val),
-                      ),
-                      StepWordMnemonics(
-                        imageBytes: _imageBytes,
-                        imageName: _imageName,
-                        wordText: _wordController.text.trim(),
-                        definitionController: _definitionController,
-                        exampleController: _exampleController,
-                        onImageSelected: (map) {
-                          if (map != null) {
-                            setState(() {
-                              _imageBytes = map['bytes'] as Uint8List;
-                              _imageName = map['name'] as String;
-                            });
-                          }
-                        },
-                      ),
-                      StepCardAesthetics(
-                        imageBytes: _imageBytes,
-                        wordText: _wordController.text.trim(),
-                        selectedGradientIndex: _selectedGradientIndex,
-                        onGradientChanged: (index) => setState(() => _selectedGradientIndex = index),
-                        selectedFrameType: _selectedFrameType,
-                        onFrameChanged: (type) => setState(() => _selectedFrameType = type),
-                      ),
-                      StepCardPreview(
-                        wordText: _wordController.text.trim(),
-                        phoneticText: _phoneticController.text.trim(),
-                        definitionText: _definitionController.text.trim(),
-                        exampleText: _exampleController.text.trim(),
-                        imageBytes: _imageBytes,
-                        recordedAudioPath: _recordedAudioPath,
-                        selectedGradientIndex: _selectedGradientIndex,
-                        selectedFrameType: _selectedFrameType,
-                      ),
-                    ],
+                  // 2. PAGEVIEW CON LOS PASOS DEL ASISTENTE
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(), // Bloquear swipe manual
+                      children: [
+                        StepWordIdentity(
+                          wordController: _wordController,
+                          selectedLanguage: _selectedLanguage,
+                          onLanguageChanged: (val) {
+                            if (val != null) setState(() => _selectedLanguage = val);
+                          },
+                        ),
+                        StepWordMnemonics(
+                          imageBytes: _imageBytes,
+                          imageName: _imageName,
+                          wordText: _wordController.text.trim(),
+                          definitionController: _definitionController,
+                          exampleController: _exampleController,
+                          onImageSelected: (map) {
+                            if (map != null) {
+                              setState(() {
+                                _imageBytes = map['bytes'] as Uint8List;
+                                _imageName = map['name'] as String;
+                              });
+                            }
+                          },
+                          selectedCategory: _selectedCategory,
+                          onCategoryChanged: (val) {
+                            if (val != null) setState(() => _selectedCategory = val);
+                          },
+                          phoneticController: _phoneticController,
+                          recordedAudioPath: _recordedAudioPath,
+                          onAudioRecorded: (val) => setState(() => _recordedAudioPath = val),
+                        ),
+                        StepCardAesthetics(
+                          imageBytes: _imageBytes,
+                          wordText: _wordController.text.trim(),
+                          selectedGradientIndex: _selectedGradientIndex,
+                          onGradientChanged: (index) => setState(() => _selectedGradientIndex = index),
+                          selectedFrameType: _selectedFrameType,
+                          onFrameChanged: (type) => setState(() => _selectedFrameType = type),
+                        ),
+                        StepCardPreview(
+                          wordText: _wordController.text.trim(),
+                          phoneticText: _phoneticController.text.trim(),
+                          definitionText: _definitionController.text.trim(),
+                          exampleText: _exampleController.text.trim(),
+                          imageBytes: _imageBytes,
+                          recordedAudioPath: _recordedAudioPath,
+                          selectedGradientIndex: _selectedGradientIndex,
+                          selectedFrameType: _selectedFrameType,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
                 // 3. BOTONERA INFERIOR (Soft UI)
                 Padding(
@@ -450,10 +447,11 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   String _getStepTitle(int step) {
     switch (step) {

@@ -1,382 +1,200 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:record/record.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/constants/app_colors.dart';
 
 class StepWordIdentity extends StatefulWidget {
   final TextEditingController wordController;
-  final TextEditingController phoneticController;
-  final String selectedCategory;
-  final ValueChanged<String?> onCategoryChanged;
   final String selectedLanguage;
   final ValueChanged<String?> onLanguageChanged;
-  final String? recordedAudioPath;
-  final ValueChanged<String?> onAudioRecorded;
 
   const StepWordIdentity({
     super.key,
     required this.wordController,
-    required this.phoneticController,
-    required this.selectedCategory,
-    required this.onCategoryChanged,
     required this.selectedLanguage,
     required this.onLanguageChanged,
-    required this.recordedAudioPath,
-    required this.onAudioRecorded,
   });
 
   @override
   State<StepWordIdentity> createState() => _StepWordIdentityState();
 }
 
-class _StepWordIdentityState extends State<StepWordIdentity> {
-  final _audioRecorder = AudioRecorder();
-  final _audioPlayer = AudioPlayer();
-  bool _isRecording = false;
-  int _recordDuration = 0;
-  Timer? _recordTimer;
-  bool _isPlayingPreview = false;
+class _StepWordIdentityState extends State<StepWordIdentity> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _rotationAnimation;
 
-  // Lista de categorías gramaticales soportadas
-  static const List<String> _categories = [
-    'Sustantivo',
-    'Verbo',
-    'Adjetivo',
-    'Frase',
-    'Adverbio',
-    'Preposición',
-    'Verbo Frasal',
-  ];
+  // Estados de animación del botón de verificación
+  double _buttonScale = 1.0;
+  bool _isVerified = false;
+  bool _hasError = false;
 
   // Lista de idiomas de aprendizaje comunes
   static const List<String> _languages = [
     'Inglés',
-    'Alemán',
-    'Francés',
-    'Italiano',
     'Español',
     'Portugués',
-    'Ruso',
+    'Francés',
+    'Italiano',
+    'Alemán',
   ];
+
+  static const Map<String, String> _languageFlags = {
+    'Inglés': 'assets/flags/us.svg',
+    'Español': 'assets/flags/mx.svg',
+    'Portugués': 'assets/flags/br.svg',
+    'Francés': 'assets/flags/fr.svg',
+    'Italiano': 'assets/flags/it.svg',
+    'Alemán': 'assets/flags/de.svg',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat(reverse: true);
+
+    // Oscila suavemente sobre el eje Y (rotación lateral 3D)
+    _rotationAnimation = Tween<double>(
+      begin: -0.65, // Aproximadamente -37 grados en radianes
+      end: 0.65,    // Aproximadamente 37 grados en radianes
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+  }
 
   @override
   void dispose() {
-    _audioRecorder.dispose();
-    _audioPlayer.dispose();
-    _recordTimer?.cancel();
+    _animationController.dispose();
     super.dispose();
   }
 
-  Future<void> _startRecording() async {
-    try {
-      if (await _audioRecorder.hasPermission()) {
-        final tempDir = await getTemporaryDirectory();
-        final path = '${tempDir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-
-        await _audioRecorder.start(
-          const RecordConfig(encoder: AudioEncoder.aacLc),
-          path: path,
-        );
-
-        setState(() {
-          _isRecording = true;
-          _recordDuration = 0;
-        });
-        widget.onAudioRecorded(null);
-
-        _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-          setState(() {
-            _recordDuration++;
-          });
-          if (_recordDuration >= 15) {
-            await _stopRecording();
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Error al iniciar grabación: $e');
-    }
-  }
-
-  Future<void> _stopRecording() async {
-    _recordTimer?.cancel();
-    try {
-      final path = await _audioRecorder.stop();
+  // Simulación de verificación animada de palabra
+  void _verifyWord() async {
+    final word = widget.wordController.text.trim();
+    if (word.isEmpty) {
+      // Feedback visual de error
       setState(() {
-        _isRecording = false;
+        _hasError = true;
       });
-      widget.onAudioRecorded(path);
-    } catch (e) {
-      debugPrint('Error al detener grabación: $e');
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) setState(() => _hasError = false);
+      });
+      return;
     }
-  }
 
-  Future<void> _deleteRecording() async {
-    if (_isPlayingPreview) {
-      await _audioPlayer.stop();
-      setState(() {
-        _isPlayingPreview = false;
-      });
-    }
-    widget.onAudioRecorded(null);
+    // Micro-animación de encogimiento
     setState(() {
-      _recordDuration = 0;
+      _buttonScale = 0.82;
     });
-  }
+    await Future.delayed(const Duration(milliseconds: 140));
 
-  Future<void> _togglePlayPreview() async {
-    if (widget.recordedAudioPath == null) return;
-
-    if (_isPlayingPreview) {
-      await _audioPlayer.stop();
+    // Rebote y marcación de éxito
+    if (mounted) {
       setState(() {
-        _isPlayingPreview = false;
-      });
-    } else {
-      await _audioPlayer.play(DeviceFileSource(widget.recordedAudioPath!));
-      setState(() {
-        _isPlayingPreview = true;
-      });
-      _audioPlayer.onPlayerComplete.first.then((_) {
-        if (mounted) {
-          setState(() {
-            _isPlayingPreview = false;
-          });
-        }
+        _buttonScale = 1.08;
+        _isVerified = true;
       });
     }
-  }
+    await Future.delayed(const Duration(milliseconds: 120));
+    if (mounted) {
+      setState(() {
+        _buttonScale = 1.0;
+      });
+    }
 
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    // Desactivar el estado verificado tras 2.5 segundos
+    await Future.delayed(const Duration(milliseconds: 2500));
+    if (mounted) {
+      setState(() {
+        _isVerified = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Identidad de la Palabra',
-            style: TextStyle(
-              color: AppColors.onSurface,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Comencemos registrando los detalles semánticos y de audio base para la palabra.',
-            style: TextStyle(
-              color: AppColors.onSurfaceMuted,
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // Campo: Palabra clave
-          const Text(
-            'Palabra *',
-            style: TextStyle(
-              color: AppColors.onSurface,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: widget.wordController,
-            textInputAction: TextInputAction.next,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Inter',
-            ),
-            decoration: InputDecoration(
-              hintText: 'Ej. Dog, Run, Beautiful...',
-              filled: true,
-              fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          // 1. TÍTULO: Palabra Clave Centrado con tipografía restaurada
+          const Center(
+            child: Text(
+              'Palabra Clave',
+              style: TextStyle(
+                color: AppColors.onSurface,
+                fontSize: 20, // Restaurado al tamaño de fuente anterior
+                fontWeight: FontWeight.bold, // Restaurado a negrita estándar
+                fontFamily: 'Inter',
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 35),
 
-          // Fila: Categoría e Idioma
-          Row(
-            children: [
-              // Dropdown: Categoría
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Categoría',
-                      style: TextStyle(
-                        color: AppColors.onSurface,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: widget.selectedCategory,
-                      onChanged: widget.onCategoryChanged,
-                      items: _categories.map((cat) {
-                        return DropdownMenuItem<String>(
-                          value: cat,
-                          child: Text(cat, style: const TextStyle(fontSize: 14, fontFamily: 'Inter')),
-                        );
-                      }).toList(),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: AppColors.surface,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                        ),
-                      ),
+          // 2. SIMULACIÓN DE CARTA VACÍA CON GIRO LATERAL 3D
+          Center(
+            child: AnimatedBuilder(
+              animation: _rotationAnimation,
+              builder: (context, child) {
+                return Transform(
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.0015) // Perspectiva de profundidad de cámara 3D
+                    ..rotateY(_rotationAnimation.value), // Rotación Y real en 3D
+                  alignment: Alignment.center,
+                  child: child,
+                );
+              },
+              child: Container(
+                width: 130,
+                height: 190,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.08),
+                      AppColors.primary.withValues(alpha: 0.18),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.05),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 14),
-
-              // Dropdown: Idioma
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Idioma',
-                      style: TextStyle(
-                        color: AppColors.onSurface,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: widget.selectedLanguage,
-                      onChanged: widget.onLanguageChanged,
-                      items: _languages.map((lang) {
-                        return DropdownMenuItem<String>(
-                          value: lang,
-                          child: Text(lang, style: const TextStyle(fontSize: 14, fontFamily: 'Inter')),
-                        );
-                      }).toList(),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: AppColors.surface,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: const Center(
+                  child: Icon(
+                    Icons.style_rounded,
+                    color: AppColors.primary,
+                    size: 44,
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 50),
 
-          // Campo: Fonética
-          const Text(
-            'Pronunciación Fonética',
-            style: TextStyle(
-              color: AppColors.onSurface,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: widget.phoneticController,
-            textInputAction: TextInputAction.next,
-            style: const TextStyle(
-              fontSize: 15,
-              fontFamily: 'Inter',
-            ),
-            decoration: InputDecoration(
-              hintText: 'Ej. /dɒɡ/, /rʌn/, /ˈbjuːtɪfl/...',
-              filled: true,
-              fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Grabación de Audio (Sección Soft UI Premium)
-          const Text(
-            'Pronunciación en Audio',
-            style: TextStyle(
-              color: AppColors.onSurface,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 10),
+          // 3. CAMPO DE ENTRADA UNIFICADO (Input palabra + Dropdown bandera redondeado)
           Container(
-            padding: const EdgeInsets.all(18),
+            height: 56,
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.4),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.02),
@@ -385,131 +203,149 @@ class _StepWordIdentityState extends State<StepWordIdentity> {
                 ),
               ],
             ),
-            child: Column(
+            child: Row(
               children: [
-                if (widget.recordedAudioPath == null && !_isRecording) ...[
-                  // Estado inicial
-                  const Icon(Icons.mic_none_rounded, size: 36, color: AppColors.onSurfaceMuted),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Graba tu pronunciación para la tarjeta (Máx. 15s)',
-                    style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 14),
-                  GestureDetector(
-                    onTap: _startRecording,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
+                // Input de la palabra
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 20),
+                    child: TextFormField(
+                      controller: widget.wordController,
+                      textInputAction: TextInputAction.next,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                        color: AppColors.onSurface,
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.fiber_manual_record, color: AppColors.error, size: 14),
-                          SizedBox(width: 8),
-                          Text(
-                            'Grabar Audio',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
                   ),
-                ] else if (_isRecording) ...[
-                  // Grabando activamente
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: AppColors.error,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Grabando... ${_formatDuration(_recordDuration)}',
-                        style: const TextStyle(
-                          color: AppColors.error,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: _stopRecording,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: AppColors.error,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.stop_rounded, color: Colors.white, size: 24),
+                ),
+
+                // Contenedor de Dropdown de Idioma (Cápsula redondeada y mejorada a la derecha)
+                Container(
+                  height: 56,
+                  width: 80,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.border.withValues(alpha: 0.2), // Fondo gris suave
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(23),
+                      bottomRight: Radius.circular(23),
                     ),
                   ),
-                ] else ...[
-                  // Grabación completada y guardada temporalmente
-                  Row(
-                    children: [
-                      // Reproducir muestra
-                      GestureDetector(
-                        onTap: _togglePlayPreview,
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _isPlayingPreview ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                            color: AppColors.primary,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Pronunciación Grabada',
-                              style: TextStyle(
-                                color: AppColors.onSurface,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: widget.selectedLanguage,
+                      isExpanded: true,
+                      icon: const Icon(Icons.arrow_drop_down, color: AppColors.onSurfaceMuted),
+                      onChanged: widget.onLanguageChanged,
+                      selectedItemBuilder: (BuildContext context) {
+                        return _languages.map<Widget>((String lang) {
+                          final flagAsset = _languageFlags[lang] ?? 'assets/flags/us.svg';
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(5),
+                              child: SvgPicture.asset(
+                                flagAsset,
+                                width: 28,
+                                height: 19,
+                                fit: BoxFit.cover,
                               ),
                             ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Presiona para escuchar una muestra',
-                              style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Eliminar grabación
-                      IconButton(
-                        onPressed: _deleteRecording,
-                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                          );
+                        }).toList();
+                      },
+                      items: _languages.map((lang) {
+                        final flagAsset = _languageFlags[lang] ?? 'assets/flags/us.svg';
+                        return DropdownMenuItem<String>(
+                          value: lang,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(3),
+                                child: SvgPicture.asset(
+                                  flagAsset,
+                                  width: 22,
+                                  height: 16,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  lang,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontFamily: 'Inter',
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 40),
+
+          // 4. BOTÓN DE VERIFICACIÓN ANIMADO (Escala + Color dinámico)
+          Center(
+            child: AnimatedScale(
+              scale: _buttonScale,
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOutBack,
+              child: GestureDetector(
+                onTap: _verifyWord,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isVerified
+                        ? Colors.green
+                        : (_hasError ? Colors.red : AppColors.primary),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_isVerified
+                                ? Colors.green
+                                : (_hasError ? Colors.red : AppColors.primary))
+                            .withValues(alpha: 0.35),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
-                ],
-              ],
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        _isVerified
+                            ? Icons.check_circle_rounded
+                            : (_hasError ? Icons.error_outline_rounded : Icons.check_rounded),
+                        key: ValueKey<String>('${_isVerified}_$_hasError'),
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],

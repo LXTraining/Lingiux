@@ -13,6 +13,7 @@ import '../../../../../core/services/audio_service.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
+import '../../../home/presentation/providers/navigation_provider.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final ChatEntity chat;
@@ -54,6 +55,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
     final cleanWord = word.replaceAll(RegExp(r"[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ']"), '');
     if (cleanWord.length < 2) return;
+
+    final wordList = ref.read(wordCardsProvider).value ?? [];
+    final hasCard = wordList.any((w) => w.word.toLowerCase() == cleanWord.toLowerCase());
 
     ref.read(audioServiceProvider).playTap();
     HapticFeedback.lightImpact();
@@ -103,64 +107,80 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             word: cleanWord,
             onTap: () {
               _dismissOverlay();
-              Navigator.push(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) =>
-                      WordDetailScreen(selectedWord: cleanWord),
-                  transitionsBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: ScaleTransition(
-                            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOut,
-                              ),
+              if (hasCard) {
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        WordDetailScreen(selectedWord: cleanWord),
+                    transitionsBuilder:
+                        (context, animation, secondaryAnimation, child) {
+                          return FadeTransition(
+                            opacity: CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOut,
                             ),
-                            child: child,
-                          ),
-                        );
-                      },
-                  transitionDuration: const Duration(milliseconds: 280),
-                ),
-              );
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOut,
+                                ),
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                    transitionDuration: const Duration(milliseconds: 280),
+                  ),
+                );
+              } else {
+                ref.read(pendingWordProvider.notifier).state = cleanWord;
+                ref.read(activeTabProvider.notifier).state = 2;
+                if (context.mounted && Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+              }
             },
           ),
           back: _WordMiniCardBack(
             word: cleanWord,
             onTap: () {
               _dismissOverlay();
-              Navigator.push(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) =>
-                      WordDetailScreen(selectedWord: cleanWord),
-                  transitionsBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: ScaleTransition(
-                            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOut,
-                              ),
+              if (hasCard) {
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        WordDetailScreen(selectedWord: cleanWord),
+                    transitionsBuilder:
+                        (context, animation, secondaryAnimation, child) {
+                          return FadeTransition(
+                            opacity: CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOut,
                             ),
-                            child: child,
-                          ),
-                        );
-                      },
-                  transitionDuration: const Duration(milliseconds: 280),
-                ),
-              );
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOut,
+                                ),
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                    transitionDuration: const Duration(milliseconds: 280),
+                  ),
+                );
+              } else {
+                ref.read(pendingWordProvider.notifier).state = cleanWord;
+                ref.read(activeTabProvider.notifier).state = 2;
+                if (context.mounted && Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+              }
             },
           ),
         ),
@@ -696,55 +716,63 @@ class _WordMiniCardFront extends ConsumerWidget {
         loading: () => [],
         error: (error, _) => [],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.auto_stories_outlined,
-            color: Colors.white,
-            size: 22,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            word,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              height: 1.2,
-              shadows: [
-                Shadow(
-                  color: Colors.black45,
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.25),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.15),
-                width: 0.5,
-              ),
-            ),
-            child: const Text(
-              'Open',
-              style: TextStyle(
+      child: wordCardsAsync.when(
+        data: (wordList) {
+          final hasCard = wordList.any((w) => w.word.toLowerCase() == word.toLowerCase());
+
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                hasCard ? Icons.auto_stories_outlined : Icons.add_circle_outline_rounded,
                 color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
+                size: 22,
               ),
-            ),
-          ),
-        ],
+              const SizedBox(height: 8),
+              Text(
+                word,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  height: 1.2,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black45,
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: hasCard ? Colors.white.withOpacity(0.25) : Colors.white.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.15),
+                    width: 0.5,
+                  ),
+                ),
+                child: Text(
+                  hasCard ? 'Open' : '+ Crear',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        loading: () => const SizedBox(),
+        error: (_, __) => const SizedBox(),
       ),
     );
   }
@@ -772,14 +800,17 @@ class _WordMiniCardBack extends ConsumerWidget {
             }
           }
 
-          final definition = matchingCard?.definition ?? 'Sin definición';
-          final phonetic = matchingCard?.phonetic ?? '';
+          final hasCard = matchingCard != null;
+          final definition = hasCard
+              ? matchingCard.definition
+              : 'Esta palabra no tiene tarjeta aún. ¡Toca aquí para crearla y memorizarla!';
+          final phonetic = hasCard ? matchingCard.phonetic : '';
 
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.g_translate_outlined,
+              Icon(
+                hasCard ? Icons.g_translate_outlined : Icons.style_outlined,
                 color: Colors.white,
                 size: 20,
               ),
