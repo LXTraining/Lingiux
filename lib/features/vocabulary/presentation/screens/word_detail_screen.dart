@@ -8,6 +8,7 @@ import '../../domain/models/word_card_model.dart';
 import '../providers/vocabulary_provider.dart';
 import '../../../profile/presentation/providers/settings_provider.dart';
 import '../../../home/presentation/providers/navigation_provider.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
 
 class WordDetailScreen extends ConsumerStatefulWidget {
   final String selectedWord;
@@ -249,11 +250,34 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                   itemBuilder: (context, index) {
                     final wordIndex = index % sortedWords.length;
                     final card = sortedWords[wordIndex];
-                    return _WordCard(
-                      wordCard: card,
-                      gradientIndex: index,
-                      isPlaying: _isPlaying && _playingAudioUrl == card.audioUrl,
-                      onPlayTapped: () => _toggleAudio(card.audioUrl),
+                    return GestureDetector(
+                      onHorizontalDragEnd: (details) {
+                        if (details.primaryVelocity != null && details.primaryVelocity! < -200) {
+                          HapticFeedback.mediumImpact();
+                          final creatorId = card.userId;
+                          if (creatorId != null && creatorId.isNotEmpty) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProfileScreen(userId: creatorId),
+                              ),
+                            );
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ProfileErrorScreen(),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: _WordCard(
+                        wordCard: card,
+                        gradientIndex: index,
+                        isPlaying: _isPlaying && _playingAudioUrl == card.audioUrl,
+                        onPlayTapped: () => _toggleAudio(card.audioUrl),
+                      ),
                     );
                   },
                 ),

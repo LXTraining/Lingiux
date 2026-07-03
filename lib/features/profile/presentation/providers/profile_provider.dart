@@ -1,24 +1,26 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 
-final profileProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
-  final authState = ref.watch(authProvider);
-  final user = authState.user;
+final profileFamilyProvider = FutureProvider.family.autoDispose<Map<String, dynamic>?, String?>((ref, userId) async {
+  final supabase = ref.read(supabaseClientProvider);
+  final effectiveUserId = userId ?? ref.watch(authProvider).user?.id;
   
-  if (user == null) {
+  if (effectiveUserId == null) {
     return null;
   }
 
-  final supabase = ref.read(supabaseClientProvider);
-  
   try {
     final data = await supabase
         .from('profiles')
         .select()
-        .eq('id', user.id)
+        .eq('id', effectiveUserId)
         .maybeSingle();
     return data;
   } catch (e) {
     return null;
   }
+});
+
+final profileProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
+  return ref.watch(profileFamilyProvider(null).future);
 });

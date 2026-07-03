@@ -9,19 +9,24 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
+import '../../../chat/presentation/screens/chat_detail_screen.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
+import '../../../chat/domain/entities/chat_entity.dart';
 import '../providers/profile_provider.dart';
 import 'settings_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
-
-
+  final String? userId;
+  const ProfileScreen({super.key, this.userId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-    final profileAsync = ref.watch(profileProvider);
-    final userCardsAsync = ref.watch(userWordCardsProvider);
+    final user = authState.user;
+    final isOwnProfile = userId == null || userId == user?.id;
+
+    final profileAsync = ref.watch(profileFamilyProvider(userId));
+    final userCardsAsync = ref.watch(userWordCardsFamilyProvider(userId));
 
     // Print de depuración para saber si las cartas se cargaron bien
     userCardsAsync.when(
@@ -30,10 +35,9 @@ class ProfileScreen extends ConsumerWidget {
       error: (err, stack) => debugPrint('ProfileScreen debug error: $err'),
     );
 
-    final user = authState.user;
-    final email = user?.email ?? '';
-    final fullName = profileAsync.value?['full_name'] ?? user?.userMetadata?['full_name'] ?? 'Usuario de Lingiux';
-    final avatarUrl = profileAsync.value?['avatar_url'] ?? user?.userMetadata?['avatar_url'] as String?;
+    final email = isOwnProfile ? (user?.email ?? '') : '';
+    final fullName = profileAsync.value?['full_name'] ?? (isOwnProfile ? (user?.userMetadata?['full_name'] ?? 'Usuario de Lingiux') : 'Usuario de Lingiux');
+    final avatarUrl = profileAsync.value?['avatar_url'] ?? (isOwnProfile ? (user?.userMetadata?['avatar_url'] as String?) : null);
     final streak = profileAsync.value?['streak_count'] ?? 0;
     final targetLanguage = profileAsync.value?['target_language'] ?? 'Inglés';
 
@@ -41,9 +45,18 @@ class ProfileScreen extends ConsumerWidget {
         ? fullName.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
         : 'LX';
 
-    return Container(
-      color: AppColors.background,
-      child: Stack(
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! > 200) {
+          if (Navigator.canPop(context)) {
+            HapticFeedback.lightImpact();
+            Navigator.pop(context);
+          }
+        }
+      },
+      child: Container(
+        color: AppColors.background,
+        child: Stack(
         children: [
           // Degradado superior premium
           Positioned(
@@ -79,27 +92,28 @@ class ProfileScreen extends ConsumerWidget {
               elevation: 0,
               backgroundColor: Colors.transparent,
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined, color: AppColors.onSurface),
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    );
-                  },
-                ),
+                if (isOwnProfile)
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined, color: AppColors.onSurface),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                      );
+                    },
+                  ),
               ],
             ),
             body: RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async {
                 HapticFeedback.mediumImpact();
-                ref.invalidate(profileProvider);
-                ref.invalidate(userWordCardsProvider);
+                ref.invalidate(profileFamilyProvider(userId));
+                ref.invalidate(userWordCardsFamilyProvider(userId));
                 try {
-                  await ref.read(profileProvider.future);
-                  await ref.read(userWordCardsProvider.future);
+                  await ref.read(profileFamilyProvider(userId).future);
+                  await ref.read(userWordCardsFamilyProvider(userId).future);
                 } catch (_) {}
               },
               child: SingleChildScrollView(
@@ -116,7 +130,7 @@ class ProfileScreen extends ConsumerWidget {
                       children: [
                         // Foto de perfil con indicador online
                         GestureDetector(
-                          onTap: () => _changeAvatar(context, ref),
+                          onTap: isOwnProfile ? () => _changeAvatar(context, ref) : null,
                           child: Stack(
                             children: [
                               Container(
@@ -241,76 +255,155 @@ class ProfileScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
+                        if (isOwnProfile) ...[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                backgroundColor: AppColors.surface,
+                              ),
+                              child: const Text(
+                                'Editar Perfil',
+                                style: TextStyle(
+                                  color: AppColors.onSurface,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                backgroundColor: AppColors.surface,
+                              ),
+                              child: const Text(
+                                'Compartir Perfil',
+                                style: TextStyle(
+                                  color: AppColors.onSurface,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
                               HapticFeedback.lightImpact();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                              );
                             },
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.border),
-                              shape: RoundedRectangleBorder(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                border: Border.all(color: AppColors.border),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              backgroundColor: AppColors.surface,
-                            ),
-                            child: const Text(
-                              'Editar Perfil',
-                              style: TextStyle(
+                              padding: const EdgeInsets.all(8),
+                              child: const Icon(
+                                Icons.menu_rounded,
                                 color: AppColors.onSurface,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                                size: 20,
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                            },
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.border),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                        ] else
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                HapticFeedback.mediumImpact();
+                                final currentUserId = ref.read(authProvider).user?.id;
+                                if (currentUserId == null) return;
+
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => const Center(
+                                    child: CircularProgressIndicator(color: AppColors.primary),
+                                  ),
+                                );
+
+                                try {
+                                  final chatService = ref.read(chatServiceProvider);
+                                  final convId = await chatService.getOrCreateConversation(
+                                    currentUserId,
+                                    userId!,
+                                  );
+
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    
+                                    final initials = fullName.trim().isNotEmpty
+                                        ? fullName.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+                                        : 'LX';
+                                        
+                                    final chatEntity = ChatEntity(
+                                      id: convId,
+                                      name: fullName,
+                                      initials: initials,
+                                      avatarColorIndex: fullName.hashCode.abs(),
+                                      lastMessage: 'Conversación iniciada',
+                                      lastMessageTime: DateTime.now(),
+                                      unreadCount: 0,
+                                      isOnline: false,
+                                      messages: const [],
+                                      avatarUrl: avatarUrl,
+                                    );
+
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ChatDetailScreen(chat: chatEntity),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error al iniciar conversación: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+                              label: const Text(
+                                'Enviar Mensaje',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              backgroundColor: AppColors.surface,
-                            ),
-                            child: const Text(
-                              'Compartir Perfil',
-                              style: TextStyle(
-                                color: AppColors.onSurface,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 0,
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                            );
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              border: Border.all(color: AppColors.border),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            child: const Icon(
-                              Icons.menu_rounded,
-                              color: AppColors.onSurface,
-                              size: 20,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -434,6 +527,7 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ],
       ),
+    ),
     );
   }
 
@@ -726,6 +820,91 @@ class _MiniWordCard extends StatelessWidget {
         child: FittedBox(
           fit: BoxFit.contain,
           child: cardWidget,
+        ),
+      ),
+    );
+  }
+}
+
+class ProfileErrorScreen extends StatelessWidget {
+  const ProfileErrorScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! > 200) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.error_outline_rounded,
+                      color: AppColors.error,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Ocurrió un error',
+                    style: TextStyle(
+                      color: AppColors.onSurface,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'No se pudo encontrar el perfil de este creador.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.onSurfaceMuted,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Volver',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
