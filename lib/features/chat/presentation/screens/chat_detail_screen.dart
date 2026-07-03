@@ -223,6 +223,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               initials: widget.chat.initials,
               colorIndex: widget.chat.avatarColorIndex,
               size: 34,
+              avatarUrl: widget.chat.avatarUrl,
             ),
             const SizedBox(width: 10),
             Column(
@@ -331,6 +332,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   initials: widget.chat.initials,
                   colorIndex: widget.chat.avatarColorIndex,
                   size: 96,
+                  avatarUrl: widget.chat.avatarUrl,
                 ),
               ),
               const SizedBox(height: 24),
@@ -561,11 +563,13 @@ class _Avatar extends StatelessWidget {
   final String initials;
   final int colorIndex;
   final double size;
+  final String? avatarUrl;
 
   const _Avatar({
     required this.initials,
     required this.colorIndex,
     this.size = 54,
+    this.avatarUrl,
   });
 
   static const List<Color> _colors = AppColors.avatarColors;
@@ -576,20 +580,24 @@ class _Avatar extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color.withAlpha(38),
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: color.withAlpha(77), width: 1.5),
       ),
-      child: Center(
-        child: Text(
-          initials,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: size * 0.32,
-          ),
-        ),
+      child: CircleAvatar(
+        backgroundColor: color.withAlpha(38),
+        backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
+            ? NetworkImage(avatarUrl!)
+            : null,
+        child: avatarUrl == null || avatarUrl!.isEmpty
+            ? Text(
+                initials,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: size * 0.32,
+                ),
+              )
+            : null,
       ),
     );
   }

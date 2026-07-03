@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -113,53 +115,56 @@ class ProfileScreen extends ConsumerWidget {
                     child: Row(
                       children: [
                         // Foto de perfil con indicador online
-                        Stack(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: CircleAvatar(
-                                radius: 46,
-                                backgroundColor: AppColors.primary.withValues(alpha: 0.9),
-                                backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                                    ? NetworkImage(avatarUrl)
-                                    : null,
-                                child: avatarUrl == null || avatarUrl.isEmpty
-                                    ? Text(
-                                        initials,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 26,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Inter',
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 2,
-                              right: 2,
-                              child: Container(
-                                width: 18,
-                                height: 18,
+                        GestureDetector(
+                          onTap: () => _changeAvatar(context, ref),
+                          child: Stack(
+                            children: [
+                              Container(
                                 decoration: BoxDecoration(
-                                  color: AppColors.online,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2.5),
+                                  border: Border.all(color: Colors.white, width: 3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.08),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 46,
+                                  backgroundColor: AppColors.primary.withValues(alpha: 0.9),
+                                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                      ? NetworkImage(avatarUrl)
+                                      : null,
+                                  child: avatarUrl == null || avatarUrl.isEmpty
+                                      ? Text(
+                                          initials,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 26,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        )
+                                      : null,
                                 ),
                               ),
-                            ),
-                          ],
+                              Positioned(
+                                bottom: 2,
+                                right: 2,
+                                child: Container(
+                                  width: 18,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.online,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         
                         // 4 Contadores (Cartas, Racha, Seguidores, Seguidos)
@@ -430,6 +435,80 @@ class ProfileScreen extends ConsumerWidget {
       ],
       ),
     );
+  }
+
+  Future<void> _changeAvatar(BuildContext context, WidgetRef ref) async {
+    try {
+      HapticFeedback.mediumImpact();
+      final ImagePicker picker = ImagePicker();
+      final XFile? file = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 500,
+        maxHeight: 500,
+      );
+      if (file == null) return;
+
+      // Mostrar diálogo de carga
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+
+      final bytes = await file.readAsBytes();
+      final supabase = ref.read(supabaseClientProvider);
+      final user = ref.read(authProvider).user;
+      if (user == null) {
+        if (context.mounted) Navigator.pop(context);
+        return;
+      }
+
+      final fileExt = file.name.split('.').last;
+      final path = 'avatars/${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+
+      // 1. Subir la foto al storage público de Supabase
+      await supabase.storage.from('word-images').uploadBinary(
+        path,
+        bytes,
+        fileOptions: FileOptions(contentType: 'image/$fileExt'),
+      );
+
+      // 2. Obtener URL pública
+      final avatarUrl = supabase.storage.from('word-images').getPublicUrl(path);
+
+      // 3. Actualizar la tabla profiles de Supabase
+      await supabase.from('profiles').update({'avatar_url': avatarUrl}).eq('id', user.id);
+
+      // 4. Quitar loader
+      if (context.mounted) Navigator.pop(context);
+
+      // 5. Invalidad proveedores para refrescar
+      ref.invalidate(profileProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Foto de perfil actualizada con éxito'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      // Quitar loader si sigue en pantalla
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al actualizar la foto de perfil: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 }
 

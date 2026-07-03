@@ -201,19 +201,24 @@ class _ChatListTile extends StatelessWidget {
                     Container(
                       width: 52,
                       height: 52,
-                      decoration: BoxDecoration(
-                        color: avatarColor.withOpacity(0.12),
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                       ),
-                      child: Center(
-                        child: Text(
-                          chat.initials,
-                          style: TextStyle(
-                            color: avatarColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
+                      child: CircleAvatar(
+                        backgroundColor: avatarColor.withOpacity(0.12),
+                        backgroundImage: chat.avatarUrl != null && chat.avatarUrl!.isNotEmpty
+                            ? NetworkImage(chat.avatarUrl!)
+                            : null,
+                        child: chat.avatarUrl == null || chat.avatarUrl!.isEmpty
+                            ? Text(
+                                chat.initials,
+                                style: TextStyle(
+                                  color: avatarColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              )
+                            : null,
                       ),
                     ),
                     if (chat.isOnline)

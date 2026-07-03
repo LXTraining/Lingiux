@@ -4,8 +4,6 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../../data/models/chat_model.dart';
 
-// Constante ID de Emma Watson para la siembra
-const emmaWatsonId = 'e11a9a10-0000-0000-0000-000000000000';
 
 // Proveedor del servicio de chat
 final chatServiceProvider = Provider((ref) => ChatService(ref.read(supabaseClientProvider)));
@@ -105,8 +103,6 @@ final chatsProvider = StreamProvider.autoDispose<List<ChatEntity>>((ref) {
 
   final supabase = ref.read(supabaseClientProvider);
 
-  // Sembrar 1 contacto inicial (Emma Watson) si no tiene conversaciones
-  _seedIfEmpty(user.id, supabase);
 
   // Escuchar la tabla conversaciones. Cada cambio (incluyendo actualizaciones de last_message)
   // gatillará el recargado de los datos relacionales de la conversación.
@@ -150,66 +146,3 @@ final messagesProvider = StreamProvider.family.autoDispose<List<MessageEntity>, 
       .map((list) => list.map((json) => MessageModel.fromJson(json, user.id)).toList());
 });
 
-// Sembrar el contacto de Emma Watson
-Future<void> _seedIfEmpty(String userId, SupabaseClient supabase) async {
-  try {
-    final existing = await supabase
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('profile_id', userId)
-        .limit(1)
-        .maybeSingle();
-
-    if (existing == null) {
-      // 1. Crear conversación
-      final conv = await supabase.from('conversations').insert({
-        'last_message': 'I think we need to transcend our current understanding to grasp the full paradigm shift happening around us.',
-        'last_message_time': DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String(),
-      }).select().single();
-
-      final convId = conv['id'] as String;
-
-      // 2. Insertar participantes
-      await supabase.from('conversation_participants').insert([
-        {'conversation_id': convId, 'profile_id': userId},
-        {'conversation_id': convId, 'profile_id': emmaWatsonId},
-      ]);
-
-      // 3. Insertar mensajes iniciales
-      await supabase.from('messages').insert([
-        {
-          'conversation_id': convId,
-          'sender_id': emmaWatsonId,
-          'text': 'Hey! Have you read that article about the ephemeral nature of digital memories?',
-          'time': DateTime.now().subtract(const Duration(hours: 1, minutes: 20)).toIso8601String(),
-        },
-        {
-          'conversation_id': convId,
-          'sender_id': userId,
-          'text': 'Yes! It was quite fascinating. The author had such an eloquent way of describing how technology shapes our perception.',
-          'time': DateTime.now().subtract(const Duration(hours: 1, minutes: 15)).toIso8601String(),
-        },
-        {
-          'conversation_id': convId,
-          'sender_id': emmaWatsonId,
-          'text': 'Exactly! I found the part about serendipity in human connections through social media particularly interesting.',
-          'time': DateTime.now().subtract(const Duration(hours: 1, minutes: 10)).toIso8601String(),
-        },
-        {
-          'conversation_id': convId,
-          'sender_id': userId,
-          'text': 'The whole concept is quite ambiguous though. Does technology truly enhance our resilience as social beings?',
-          'time': DateTime.now().subtract(const Duration(hours: 1, minutes: 5)).toIso8601String(),
-        },
-        {
-          'conversation_id': convId,
-          'sender_id': emmaWatsonId,
-          'text': 'I think we need to transcend our current understanding to grasp the full paradigm shift happening around us.',
-          'time': DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String(),
-        },
-      ]);
-    }
-  } catch (e) {
-    // Silencioso
-  }
-}
