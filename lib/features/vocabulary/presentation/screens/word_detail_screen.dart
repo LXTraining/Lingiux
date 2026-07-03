@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -6,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../domain/models/word_card_model.dart';
 import '../providers/vocabulary_provider.dart';
 import '../../../profile/presentation/providers/settings_provider.dart';
+import '../../../home/presentation/providers/navigation_provider.dart';
 
 class WordDetailScreen extends ConsumerStatefulWidget {
   final String selectedWord;
@@ -264,7 +266,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   }
 }
 
-class _WordCard extends StatelessWidget {
+class _WordCard extends ConsumerWidget {
   final WordCardModel wordCard;
   final int gradientIndex;
   final bool isPlaying;
@@ -367,7 +369,7 @@ class _WordCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     int gradIdx = gradientIndex;
     if (wordCard.canvasDesign != null && wordCard.canvasDesign!['gradient_index'] != null) {
       final rawIndex = wordCard.canvasDesign!['gradient_index'];
@@ -376,6 +378,172 @@ class _WordCard extends StatelessWidget {
       }
     }
     final gradient = _gradients[gradIdx % _gradients.length];
+
+    final bool isTemp = wordCard.id == 'temp';
+
+    if (isTemp) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: gradient[0].withValues(alpha: 0.35),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Círculos de diseño abstractos y sutiles en el fondo
+              Positioned(
+                right: -40,
+                top: -40,
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: -30,
+                bottom: -30,
+                child: Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+
+              // Contenido principal de la tarjeta
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Fila superior: etiqueta
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'CREAR CARTA',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+
+                    // Icono central decorativo
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome_outlined,
+                          color: Colors.white,
+                          size: 56,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Palabra clave
+                    Text(
+                      wordCard.word,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.bold,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Mensaje experto
+                    Text(
+                      'Esta palabra aún no cuenta con una tarjeta mnemotécnica en tu colección personal. Comienza a potenciar tu vocabulario creándola ahora mismo.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                    const Spacer(),
+
+                    // Botón para redirigir al editor
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        ref.read(pendingWordProvider.notifier).state = wordCard.word;
+                        ref.read(activeTabProvider.notifier).state = 2;
+                        Navigator.popUntil(context, (route) => route.isFirst);
+                      },
+                      icon: Icon(Icons.edit_note_rounded, color: gradient[0]),
+                      label: Text(
+                        'Diseñar Tarjeta',
+                        style: TextStyle(
+                          color: gradient[0],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     String frameType = 'normal';
     if (wordCard.canvasDesign != null && wordCard.canvasDesign!['frame_type'] != null) {

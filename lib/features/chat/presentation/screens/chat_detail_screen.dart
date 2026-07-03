@@ -107,80 +107,64 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             word: cleanWord,
             onTap: () {
               _dismissOverlay();
-              if (hasCard) {
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) =>
-                        WordDetailScreen(selectedWord: cleanWord),
-                    transitionsBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOut,
-                            ),
-                            child: ScaleTransition(
-                              scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                                CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOut,
-                                ),
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      WordDetailScreen(selectedWord: cleanWord),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: ScaleTransition(
+                            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOut,
                               ),
-                              child: child,
                             ),
-                          );
-                        },
-                    transitionDuration: const Duration(milliseconds: 280),
-                  ),
-                );
-              } else {
-                ref.read(pendingWordProvider.notifier).state = cleanWord;
-                ref.read(activeTabProvider.notifier).state = 2;
-                if (context.mounted && Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
-              }
+                            child: child,
+                          ),
+                        );
+                      },
+                  transitionDuration: const Duration(milliseconds: 280),
+                ),
+              );
             },
           ),
           back: _WordMiniCardBack(
             word: cleanWord,
             onTap: () {
               _dismissOverlay();
-              if (hasCard) {
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) =>
-                        WordDetailScreen(selectedWord: cleanWord),
-                    transitionsBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOut,
-                            ),
-                            child: ScaleTransition(
-                              scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                                CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOut,
-                                ),
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      WordDetailScreen(selectedWord: cleanWord),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: ScaleTransition(
+                            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOut,
                               ),
-                              child: child,
                             ),
-                          );
-                        },
-                    transitionDuration: const Duration(milliseconds: 280),
-                  ),
-                );
-              } else {
-                ref.read(pendingWordProvider.notifier).state = cleanWord;
-                ref.read(activeTabProvider.notifier).state = 2;
-                if (context.mounted && Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
-              }
+                            child: child,
+                          ),
+                        );
+                      },
+                  transitionDuration: const Duration(milliseconds: 280),
+                ),
+              );
             },
           ),
         ),
