@@ -8,3 +8,5 @@ final pendingWordProvider = StateProvider<String?>((ref) => null);
 final homeScaffoldKeyProvider = Provider<GlobalKey<ScaffoldState>>((ref) {
   return GlobalKey<ScaffoldState>();
 });
+
+final isCardEditorActiveProvider = StateProvider<bool>((ref) => false);

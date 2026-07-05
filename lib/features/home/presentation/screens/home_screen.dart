@@ -17,6 +17,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = ref.watch(activeTabProvider);
     final homeScaffoldKey = ref.watch(homeScaffoldKeyProvider);
+    final isCardEditorActive = ref.watch(isCardEditorActiveProvider);
 
     final screens = [
       const FeedScreen(),
@@ -34,31 +35,33 @@ class HomeScreen extends ConsumerWidget {
         index: selectedIndex,
         children: screens,
       ),
-      bottomNavigationBar: Container(
-        height: 72 + MediaQuery.of(context).padding.bottom,
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 10,
-          bottom: MediaQuery.of(context).padding.bottom + 10,
-        ),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(
-            top: BorderSide(color: AppColors.border, width: 1),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(context, ref, 0, Icons.home_outlined, Icons.home_rounded, AppStrings.navInicio, selectedIndex),
-            _buildNavItem(context, ref, 1, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, AppStrings.navChats, selectedIndex),
-            _buildNavItem(context, ref, 2, Icons.add_circle_outline_rounded, Icons.add_circle_rounded, AppStrings.navCrear, selectedIndex),
-            _buildNavItem(context, ref, 3, Icons.people_outline_rounded, Icons.people_rounded, AppStrings.navComunidad, selectedIndex),
-            _buildNavItem(context, ref, 4, Icons.person_outline_rounded, Icons.person_rounded, AppStrings.navPerfil, selectedIndex),
-          ],
-        ),
-      ),
+      bottomNavigationBar: isCardEditorActive
+          ? null
+          : Container(
+              height: 72 + MediaQuery.of(context).padding.bottom,
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 10,
+                bottom: MediaQuery.of(context).padding.bottom + 10,
+              ),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                  top: BorderSide(color: AppColors.border, width: 1),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(context, ref, 0, Icons.home_outlined, Icons.home_rounded, AppStrings.navInicio, selectedIndex),
+                  _buildNavItem(context, ref, 1, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, AppStrings.navChats, selectedIndex),
+                  _buildNavItem(context, ref, 2, Icons.add_circle_outline_rounded, Icons.add_circle_rounded, AppStrings.navCrear, selectedIndex),
+                  _buildNavItem(context, ref, 3, Icons.people_outline_rounded, Icons.people_rounded, AppStrings.navComunidad, selectedIndex),
+                  _buildNavItem(context, ref, 4, Icons.person_outline_rounded, Icons.person_rounded, AppStrings.navPerfil, selectedIndex),
+                ],
+              ),
+            ),
     );
   }
 

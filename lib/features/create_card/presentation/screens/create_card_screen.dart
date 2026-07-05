@@ -6,9 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../widgets/step_word_identity.dart';
-import '../widgets/step_word_mnemonics.dart';
-import '../widgets/step_card_aesthetics.dart';
-import '../widgets/step_card_preview.dart';
+import '../widgets/card_editor_widget.dart';
 import '../../../home/presentation/providers/navigation_provider.dart';
 
 class CreateCardScreen extends ConsumerStatefulWidget {
@@ -20,8 +18,7 @@ class CreateCardScreen extends ConsumerStatefulWidget {
 }
 
 class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
-  final PageController _pageController = PageController();
-  int _currentStep = 0;
+  int _currentStep = 0; // 0 = Identidad / Validador, 1 = Editor interactivo en tiempo real
   bool _isSaving = false;
 
   // ESTADO LOCAL DE LA NUEVA TARJETA
@@ -42,7 +39,6 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
 
   @override
   void dispose() {
-    _pageController.dispose();
     _wordController.dispose();
     _phoneticController.dispose();
     _definitionController.dispose();
@@ -62,41 +58,19 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
         );
         return;
       }
-    } else if (_currentStep == 1) {
-      // Validar Paso 2: Definición requerida
-      if (_definitionController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor, ingresa una definición o traducción.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
-      }
-    }
-
-    if (_currentStep < 3) {
       setState(() {
-        _currentStep++;
+        _currentStep = 1;
       });
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOutCubic,
-      );
-    } else {
-      _saveCard();
+      ref.read(isCardEditorActiveProvider.notifier).state = true;
     }
   }
 
   void _prevStep() {
     if (_currentStep > 0) {
       setState(() {
-        _currentStep--;
+        _currentStep = 0;
       });
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOutCubic,
-      );
+      ref.read(isCardEditorActiveProvider.notifier).state = false;
     }
   }
 
@@ -170,7 +144,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
           ),
         );
         
-        // Limpiar el formulario y reiniciar el Stepper
+        // Limpiar el formulario y reiniciar
         _wordController.clear();
         _phoneticController.clear();
         _definitionController.clear();
@@ -183,9 +157,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
           _selectedGradientIndex = 0;
           _selectedFrameType = 'normal';
         });
-        if (_pageController.hasClients) {
-          _pageController.jumpToPage(0);
-        }
+        ref.read(isCardEditorActiveProvider.notifier).state = false;
 
         // Redirigir a la pestaña de Inicio/Feed (Pestaña 0)
         ref.read(activeTabProvider.notifier).state = 0;
@@ -217,6 +189,43 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
       }
     });
 
+    if (_currentStep == 1) {
+      return CardEditorWidget(
+        wordController: _wordController,
+        definitionController: _definitionController,
+        phoneticController: _phoneticController,
+        exampleController: _exampleController,
+        selectedCategory: _selectedCategory,
+        onCategoryChanged: (val) => setState(() => _selectedCategory = val),
+        selectedLanguage: _selectedLanguage,
+        imageBytes: _imageBytes,
+        imageName: _imageName,
+        onImageSelected: (map) {
+          if (map != null) {
+            setState(() {
+              _imageBytes = map['bytes'] as Uint8List;
+              _imageName = map['name'] as String;
+            });
+          } else {
+            setState(() {
+              _imageBytes = null;
+              _imageName = null;
+            });
+          }
+        },
+        recordedAudioPath: _recordedAudioPath,
+        onAudioRecorded: (val) => setState(() => _recordedAudioPath = val),
+        selectedGradientIndex: _selectedGradientIndex,
+        onGradientChanged: (index) => setState(() => _selectedGradientIndex = index),
+        selectedFrameType: _selectedFrameType,
+        onFrameChanged: (type) => setState(() => _selectedFrameType = type),
+        onBack: _prevStep,
+        onSave: _saveCard,
+        isSaving: _isSaving,
+      );
+    }
+
+    // Step 0 - Validator Screen
     return Container(
       color: AppColors.background,
       child: Stack(
@@ -247,17 +256,17 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 16),
-                  // 1. BARRA DE PROGRESO DEL STEPPER (Hasta arriba y más gruesa)
+                  // Progress Bar (Paso 1 de 2)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
                     child: Column(
                       children: [
-                        Row(
+                        const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              _getStepTitle(_currentStep),
-                              style: const TextStyle(
+                              'IDENTIDAD',
+                              style: TextStyle(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
@@ -266,8 +275,8 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                               ),
                             ),
                             Text(
-                              'Paso ${_currentStep + 1} de 4',
-                              style: const TextStyle(
+                              'Paso 1 de 2',
+                              style: TextStyle(
                                 color: AppColors.onSurfaceMuted,
                                 fontSize: 11,
                                 fontFamily: 'Inter',
@@ -276,7 +285,6 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        // Barra de progreso lineal animada (Más gruesa)
                         Stack(
                           children: [
                             Container(
@@ -287,12 +295,9 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
+                            Container(
                               height: 8,
-                              width: MediaQuery.of(context).size.width *
-                                  0.88 *
-                                  ((_currentStep + 1) / 4),
+                              width: MediaQuery.of(context).size.width * 0.88 * 0.5, // 50%
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
                                   colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
@@ -306,165 +311,53 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
-                  // 2. PAGEVIEW CON LOS PASOS DEL ASISTENTE
                   Expanded(
-                    child: PageView(
-                      controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(), // Bloquear swipe manual
-                      children: [
-                        StepWordIdentity(
-                          wordController: _wordController,
-                          selectedLanguage: _selectedLanguage,
-                          onLanguageChanged: (val) {
-                            if (val != null) setState(() => _selectedLanguage = val);
-                          },
-                        ),
-                        StepWordMnemonics(
-                          imageBytes: _imageBytes,
-                          imageName: _imageName,
-                          wordText: _wordController.text.trim(),
-                          definitionController: _definitionController,
-                          exampleController: _exampleController,
-                          onImageSelected: (map) {
-                            if (map != null) {
-                              setState(() {
-                                _imageBytes = map['bytes'] as Uint8List;
-                                _imageName = map['name'] as String;
-                              });
-                            }
-                          },
-                          selectedCategory: _selectedCategory,
-                          onCategoryChanged: (val) {
-                            if (val != null) setState(() => _selectedCategory = val);
-                          },
-                          phoneticController: _phoneticController,
-                          recordedAudioPath: _recordedAudioPath,
-                          onAudioRecorded: (val) => setState(() => _recordedAudioPath = val),
-                        ),
-                        StepCardAesthetics(
-                          imageBytes: _imageBytes,
-                          wordText: _wordController.text.trim(),
-                          selectedGradientIndex: _selectedGradientIndex,
-                          onGradientChanged: (index) => setState(() => _selectedGradientIndex = index),
-                          selectedFrameType: _selectedFrameType,
-                          onFrameChanged: (type) => setState(() => _selectedFrameType = type),
-                        ),
-                        StepCardPreview(
-                          wordText: _wordController.text.trim(),
-                          phoneticText: _phoneticController.text.trim(),
-                          definitionText: _definitionController.text.trim(),
-                          exampleText: _exampleController.text.trim(),
-                          imageBytes: _imageBytes,
-                          recordedAudioPath: _recordedAudioPath,
-                          selectedGradientIndex: _selectedGradientIndex,
-                          selectedFrameType: _selectedFrameType,
-                        ),
-                      ],
+                    child: StepWordIdentity(
+                      wordController: _wordController,
+                      selectedLanguage: _selectedLanguage,
+                      onLanguageChanged: (val) {
+                        if (val != null) setState(() => _selectedLanguage = val);
+                      },
                     ),
                   ),
-
-                // 3. BOTONERA INFERIOR (Soft UI)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                  child: Row(
-                    children: [
-                      // Botón Atrás (Solo visible si paso > 0)
-                      if (_currentStep > 0) ...[
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: _prevStep,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: AppColors.border.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  'Atrás',
-                                  style: TextStyle(
-                                    color: AppColors.onSurfaceMuted,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Inter',
-                                  ),
-                                ),
-                              ),
+                  // Button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    child: GestureDetector(
+                      onTap: _nextStep,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 14),
-                      ],
-
-                      // Botón Continuar / Crear
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: _isSaving ? null : _nextStep,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              color: _isSaving ? AppColors.onSurfaceMuted : Colors.black,
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                if (!_isSaving)
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                              ],
-                            ),
-                            child: Center(
-                              child: _isSaving
-                                  ? const SizedBox(
-                                      height: 18,
-                                      width: 18,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : Text(
-                                      _currentStep == 3 ? 'Crear Tarjeta Mental' : 'Continuar',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Inter',
-                                      ),
-                                    ),
+                        child: const Center(
+                          child: Text(
+                            'Continuar',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
                             ),
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
-
-  String _getStepTitle(int step) {
-    switch (step) {
-      case 0:
-        return 'IDENTIDAD';
-      case 1:
-        return 'NEMOTECNIA';
-      case 2:
-        return 'ESTÉTICA';
-      case 3:
-        return 'PREVISUALIZACIÓN';
-      default:
-        return '';
-    }
+        ],
+      ),
+    );
   }
 }
