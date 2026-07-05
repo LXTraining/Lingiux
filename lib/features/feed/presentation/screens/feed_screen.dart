@@ -5,8 +5,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
-import '../widgets/streak_drawer.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
+import '../../../home/presentation/providers/navigation_provider.dart';
 
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
@@ -47,7 +47,6 @@ class FeedScreen extends ConsumerWidget {
           ),
           Scaffold(
             backgroundColor: Colors.transparent,
-            drawer: const StreakDrawer(),
             appBar: AppBar(
               leading: Builder(
                 builder: (context) {
@@ -62,7 +61,7 @@ class FeedScreen extends ConsumerWidget {
                   return GestureDetector(
                     onTap: () {
                       HapticFeedback.lightImpact();
-                      Scaffold.of(context).openDrawer();
+                      ref.read(homeScaffoldKeyProvider).currentState?.openDrawer();
                     },
                     child: Padding(
                       padding: const EdgeInsets.only(left: 12.0, top: 10.0, bottom: 10.0),

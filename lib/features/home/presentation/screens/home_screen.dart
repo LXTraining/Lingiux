@@ -8,6 +8,7 @@ import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../providers/navigation_provider.dart';
+import '../../../feed/presentation/widgets/streak_drawer.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -15,6 +16,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = ref.watch(activeTabProvider);
+    final homeScaffoldKey = ref.watch(homeScaffoldKeyProvider);
 
     final screens = [
       const FeedScreen(),
@@ -25,6 +27,9 @@ class HomeScreen extends ConsumerWidget {
     ];
 
     return Scaffold(
+      key: homeScaffoldKey,
+      drawer: const StreakDrawer(),
+      drawerEnableOpenDragGesture: selectedIndex == 0,
       body: IndexedStack(
         index: selectedIndex,
         children: screens,
