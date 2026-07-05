@@ -5,6 +5,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
+import '../widgets/streak_drawer.dart';
+import '../../../profile/presentation/providers/profile_provider.dart';
 
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
@@ -45,7 +47,104 @@ class FeedScreen extends ConsumerWidget {
           ),
           Scaffold(
             backgroundColor: Colors.transparent,
+            drawer: const StreakDrawer(),
             appBar: AppBar(
+              leading: Builder(
+                builder: (context) {
+                  final profile = ref.watch(profileProvider).value;
+                  final avatarUrl = profile?['avatar_url'] as String?;
+                  final streakCount = profile?['streak_count'] as int? ?? 0;
+                  final fullName = profile?['full_name'] ?? '';
+                  final initials = fullName.isNotEmpty
+                      ? fullName.split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+                      : 'LX';
+
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Scaffold.of(context).openDrawer();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12.0, top: 10.0, bottom: 10.0),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: CircleAvatar(
+                              backgroundColor: AppColors.primary,
+                              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl == null || avatarUrl.isEmpty
+                                  ? Text(
+                                      initials,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                          if (streakCount > 0)
+                            Positioned(
+                              right: -6,
+                              bottom: -2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF6B8B),
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFFF6B8B).withOpacity(0.4),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      '🔥',
+                                      style: TextStyle(fontSize: 8),
+                                    ),
+                                    const SizedBox(width: 1),
+                                    Text(
+                                      '$streakCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
               title: const Text(AppStrings.navInicio),
               actions: [
                 IconButton(
