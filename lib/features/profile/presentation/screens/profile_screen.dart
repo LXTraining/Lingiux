@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
@@ -11,9 +12,28 @@ import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../../../chat/presentation/screens/chat_detail_screen.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../chat/domain/entities/chat_entity.dart';
 import '../providers/profile_provider.dart';
 import 'settings_screen.dart';
+
+final userBioProvider = FutureProvider.family.autoDispose<String, String>((ref, userId) async {
+  final prefs = await SharedPreferences.getInstance();
+  final local = prefs.getString('user_bio_$userId');
+  if (local != null && local.isNotEmpty) {
+    return local;
+  }
+  
+  try {
+    final profile = await ref.watch(profileFamilyProvider(userId).future);
+    final dbBio = profile?['bio'] as String?;
+    if (dbBio != null && dbBio.isNotEmpty) {
+      return dbBio;
+    }
+  } catch (_) {}
+  
+  return '¡Hola! Estoy aprendiendo idiomas en Lingiux 🚀';
+});
 
 class ProfileScreen extends ConsumerWidget {
   final String? userId;
@@ -24,9 +44,11 @@ class ProfileScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final isOwnProfile = userId == null || userId == user?.id;
+    final effectiveUserId = userId ?? user?.id;
 
     final profileAsync = ref.watch(profileFamilyProvider(userId));
     final userCardsAsync = ref.watch(userWordCardsFamilyProvider(userId));
+    final bioAsync = ref.watch(userBioProvider(effectiveUserId ?? ''));
 
     // Print de depuración para saber si las cartas se cargaron bien
     userCardsAsync.when(
@@ -38,7 +60,6 @@ class ProfileScreen extends ConsumerWidget {
     final email = isOwnProfile ? (user?.email ?? '') : '';
     final fullName = profileAsync.value?['full_name'] ?? (isOwnProfile ? (user?.userMetadata?['full_name'] ?? 'Usuario de Lingiux') : 'Usuario de Lingiux');
     final avatarUrl = profileAsync.value?['avatar_url'] ?? (isOwnProfile ? (user?.userMetadata?['avatar_url'] as String?) : null);
-    final streak = profileAsync.value?['streak_count'] ?? 0;
     final targetLanguage = profileAsync.value?['target_language'] ?? 'Inglés';
 
     final initials = fullName.trim().isNotEmpty
@@ -121,292 +142,439 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 16),
-                  
-                  // Fila de Cabecera Estilo Instagram (Foto a la izquierda, contadores a la derecha)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        // Foto de perfil con indicador online
-                        GestureDetector(
-                          onTap: isOwnProfile ? () => _changeAvatar(context, ref) : null,
-                          child: Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 3),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.08),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
+                    // --- CABECERA ALINEADA A LA IZQUIERDA CON BANDERAS ---
+                    const SizedBox(height: 14),
+                    
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // 1. Foto de perfil circular alineada a la izquierda (pulsable para cambiar)
+                          GestureDetector(
+                            onTap: isOwnProfile ? () => _changeAvatar(context, ref) : null,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2.5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.08),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 36, // Radio compacto
+                                    backgroundColor: AppColors.primary,
+                                    backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                        ? NetworkImage(avatarUrl)
+                                        : null,
+                                    child: avatarUrl == null || avatarUrl.isEmpty
+                                        ? Text(
+                                            initials,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                              fontFamily: 'Inter',
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                                // Indicador online
+                                Positioned(
+                                  bottom: 2,
+                                  right: 2,
+                                  child: Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.online,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          const SizedBox(width: 16),
+
+                          // 2. Nickname, estrellas y banderas a la derecha de la foto
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  fullName,
+                                  style: const TextStyle(
+                                    color: AppColors.onSurface,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: List.generate(5, (index) => const Icon(
+                                    Icons.star_rounded,
+                                    color: Colors.amber,
+                                    size: 14,
+                                  )),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    // Bandera nativa de nacimiento (Español/México por defecto)
+                                    Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 1.5),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.08),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ClipOval(
+                                        child: SvgPicture.asset(
+                                          profileAsync.value?['native_language'] == 'Inglés' ? 'assets/flags/us.svg' : 'assets/flags/mx.svg',
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Icono de transición
+                                    const Icon(
+                                      Icons.arrow_forward_rounded,
+                                      size: 12,
+                                      color: AppColors.onSurfaceMuted,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Bandera del idioma que aprende
+                                    Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 1.5),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.08),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ClipOval(
+                                        child: SvgPicture.asset(
+                                          targetLanguage == 'Inglés' ? 'assets/flags/us.svg' : 'assets/flags/mx.svg',
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
-                                child: CircleAvatar(
-                                  radius: 46,
-                                  backgroundColor: AppColors.primary.withValues(alpha: 0.9),
-                                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                                      ? NetworkImage(avatarUrl)
-                                      : null,
-                                  child: avatarUrl == null || avatarUrl.isEmpty
-                                      ? Text(
-                                          initials,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 26,
-                                            fontWeight: FontWeight.bold,
-                                            fontFamily: 'Inter',
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                              ),
-                              Positioned(
-                                bottom: 2,
-                                right: 2,
-                                child: Container(
-                                  width: 18,
-                                  height: 18,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.online,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2.5),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          // 3. Stats de cartas creadas a la derecha de la fila (estilo Plato)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.border, width: 0.5),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  userCardsAsync.when(
+                                    data: (cards) => cards.length.toString(),
+                                    loading: () => '...',
+                                    error: (err, stack) => '0',
+                                  ),
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'Inter',
                                   ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 2),
+                                const Text(
+                                    'CARTAS',
+                                    style: TextStyle(
+                                      color: AppColors.onSurfaceMuted,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                        
-                        // 4 Contadores (Cartas, Racha, Seguidores, Seguidos)
-                        Expanded(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _StatColumn(
-                                value: userCardsAsync.when(
-                                  data: (cards) => cards.length.toString(),
-                                  loading: () => '...',
-                                  error: (err, stack) => '0',
-                                ),
-                                label: 'Cartas',
-                              ),
-                              _StatColumn(
-                                value: '$streak',
-                                label: 'Racha',
-                              ),
-                              const _StatColumn(
-                                value: '128',
-                                label: 'Seguidores',
-                              ),
-                              const _StatColumn(
-                                value: '92',
-                                label: 'Seguidos',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  // Sección de Bio (Nombre completo, email, idioma, descripción)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          fullName,
-                          style: const TextStyle(
-                            color: AppColors.onSurface,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
+                    if (email.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
                           email,
                           style: const TextStyle(
                             color: AppColors.onSurfaceMuted,
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Aprender idiomas con Lingiux 🚀\nIdioma objetivo: $targetLanguage',
-                          style: const TextStyle(
-                            color: AppColors.onSurface,
-                            fontSize: 13,
-                            height: 1.4,
+                      ),
+                    ],
+
+                    const SizedBox(height: 14),
+
+                    // Cuadro de estado/descripción (mensaje configurable por el usuario)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: GestureDetector(
+                        onTap: isOwnProfile
+                            ? () {
+                                final bioText = bioAsync.value ?? '¡Hola! Estoy aprendiendo idiomas en Lingiux 🚀';
+                                _editBio(context, ref, bioText, effectiveUserId ?? '');
+                              }
+                            : null,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.surfaceVariant.withValues(alpha: 0.3),
+                                AppColors.surfaceVariant.withValues(alpha: 0.6),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppColors.border.withValues(alpha: 0.7),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Text(
+                                  bioAsync.when(
+                                    data: (bio) => bio,
+                                    loading: () => 'Cargando descripción...',
+                                    error: (err, stack) => '¡Hola! Estoy aprendiendo idiomas en Lingiux 🚀',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: AppColors.onSurface,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.4,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ),
+                              if (isOwnProfile)
+                                const Positioned(
+                                  top: 0,
+                                  right: 0,
+                                  child: Icon(
+                                    Icons.mode_edit_outline_rounded,
+                                    size: 13,
+                                    color: AppColors.onSurfaceMuted,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
 
-                  // Botones de acción horizontales estilo Instagram
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        if (isOwnProfile) ...[
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                              },
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.border),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                backgroundColor: AppColors.surface,
-                              ),
-                              child: const Text(
-                                'Editar Perfil',
-                                style: TextStyle(
-                                  color: AppColors.onSurface,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                              },
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.border),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                backgroundColor: AppColors.surface,
-                              ),
-                              child: const Text(
-                                'Compartir Perfil',
-                                style: TextStyle(
-                                  color: AppColors.onSurface,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                              );
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                border: Border.all(color: AppColors.border),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              padding: const EdgeInsets.all(8),
-                              child: const Icon(
-                                Icons.menu_rounded,
-                                color: AppColors.onSurface,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ] else
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                HapticFeedback.mediumImpact();
-                                final currentUserId = ref.read(authProvider).user?.id;
-                                if (currentUserId == null) return;
+                    const SizedBox(height: 12),
 
-                                showDialog(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (context) => const Center(
-                                    child: CircularProgressIndicator(color: AppColors.primary),
-                                  ),
+                    // 4. Botones de acción horizontal compactos (altura 38)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        children: [
+                          if (isOwnProfile) ...[
+                            // Ajustes (Engranaje)
+                            GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                                 );
+                              },
+                              child: Container(
+                                height: 38,
+                                width: 38,
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.border, width: 0.5),
+                                ),
+                                child: const Icon(
+                                  Icons.settings_outlined,
+                                  color: AppColors.onSurface,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Botón de Editar Perfil
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  HapticFeedback.lightImpact();
+                                },
+                                icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 16),
+                                label: const Text(
+                                  'EDITAR PERFIL',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  elevation: 0,
+                                  minimumSize: const Size.fromHeight(38),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Compartir
+                            GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                              },
+                              child: Container(
+                                height: 38,
+                                width: 38,
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.border, width: 0.5),
+                                ),
+                                child: const Icon(
+                                  Icons.share_rounded,
+                                  color: AppColors.onSurface,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            // Mensaje directo (Perfil ajeno)
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  HapticFeedback.mediumImpact();
+                                  final currentUserId = ref.read(authProvider).user?.id;
+                                  if (currentUserId == null) return;
 
-                                try {
-                                  final chatService = ref.read(chatServiceProvider);
-                                  final convId = await chatService.getOrCreateConversation(
-                                    currentUserId,
-                                    userId!,
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (context) => const Center(
+                                      child: CircularProgressIndicator(color: AppColors.primary),
+                                    ),
                                   );
 
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-                                    
-                                    final initials = fullName.trim().isNotEmpty
-                                        ? fullName.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
-                                        : 'LX';
-                                        
-                                    final chatEntity = ChatEntity(
-                                      id: convId,
-                                      name: fullName,
-                                      initials: initials,
-                                      avatarColorIndex: fullName.hashCode.abs(),
-                                      lastMessage: 'Conversación iniciada',
-                                      lastMessageTime: DateTime.now(),
-                                      unreadCount: 0,
-                                      isOnline: false,
-                                      messages: const [],
-                                      avatarUrl: avatarUrl,
+                                  try {
+                                    final chatService = ref.read(chatServiceProvider);
+                                    final convId = await chatService.getOrCreateConversation(
+                                      currentUserId,
+                                      userId!,
                                     );
 
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ChatDetailScreen(chat: chatEntity),
-                                      ),
-                                    );
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                      
+                                      final initials = fullName.trim().isNotEmpty
+                                          ? fullName.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+                                          : 'LX';
+                                          
+                                      final chatEntity = ChatEntity(
+                                        id: convId,
+                                        name: fullName,
+                                        initials: initials,
+                                        avatarColorIndex: fullName.hashCode.abs(),
+                                        lastMessage: 'Conversación iniciada',
+                                        lastMessageTime: DateTime.now(),
+                                        unreadCount: 0,
+                                        isOnline: false,
+                                        messages: const [],
+                                        avatarUrl: avatarUrl,
+                                      );
+
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ChatDetailScreen(chat: chatEntity),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Error al iniciar conversación: $e')),
+                                      );
+                                    }
                                   }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error al iniciar conversación: $e')),
-                                    );
-                                  }
-                                }
-                              },
-                              icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
-                              label: const Text(
-                                'Enviar Mensaje',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                                },
+                                icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 16),
+                                label: const Text(
+                                  'ENVIAR MENSAJE',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  elevation: 0,
+                                  minimumSize: const Size.fromHeight(38),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
-                                elevation: 0,
                               ),
                             ),
-                          ),
-                      ],
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
 
                   // Pestañas de Selección de Vista (Grid de publicaciones activo)
                   const SizedBox(height: 20),
@@ -604,41 +772,78 @@ class ProfileScreen extends ConsumerWidget {
       }
     }
   }
-}
 
-class _StatColumn extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _StatColumn({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.onSurface,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Inter',
+  void _editBio(BuildContext context, WidgetRef ref, String currentBio, String effectiveUserId) {
+    final textController = TextEditingController(text: currentBio);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Editar Estado / Descripción',
+            style: TextStyle(
+              color: AppColors.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.onSurfaceMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
+          content: TextField(
+            controller: textController,
+            maxLength: 100,
+            maxLines: 3,
+            style: const TextStyle(color: AppColors.onSurface),
+            decoration: InputDecoration(
+              hintText: 'Escribe tu descripción...',
+              hintStyle: const TextStyle(color: AppColors.onSurfaceMuted),
+              counterStyle: const TextStyle(color: AppColors.onSurfaceMuted),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: AppColors.border, width: 1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
           ),
-        ),
-      ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCELAR', style: TextStyle(color: AppColors.onSurfaceMuted)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newBio = textController.text.trim();
+                Navigator.pop(context);
+                
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('user_bio_$effectiveUserId', newBio);
+                  
+                  final supabase = ref.read(supabaseClientProvider);
+                  await supabase.from('profiles').update({'bio': newBio}).eq('id', effectiveUserId);
+                } catch (e) {
+                  debugPrint('Error guardando bio: $e');
+                }
+                
+                ref.invalidate(userBioProvider(effectiveUserId));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('GUARDAR', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
     );
   }
 }
+
+
 
 class _MiniWordCard extends StatelessWidget {
   final WordCardModel wordCard;
