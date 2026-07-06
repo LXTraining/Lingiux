@@ -411,7 +411,7 @@ class _WordCard extends ConsumerWidget {
         text,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 14,
+          fontSize: 16,
           fontFamily: 'Inter',
         ),
         textAlign: TextAlign.center,
@@ -427,7 +427,7 @@ class _WordCard extends ConsumerWidget {
         text,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 14,
+          fontSize: 16,
           fontFamily: 'Inter',
         ),
         textAlign: TextAlign.center,
@@ -443,7 +443,7 @@ class _WordCard extends ConsumerWidget {
       text: TextSpan(
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 14,
+          fontSize: 16,
           fontFamily: 'Inter',
         ),
         children: [
@@ -461,27 +461,7 @@ class _WordCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuizButton(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.25),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -762,18 +742,20 @@ class _WordCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
 
-                // 1. Palabra clave (Centrada arriba)
-                Text(
-                  wordCard.word.toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    height: 1.1,
-                    letterSpacing: 1.5,
-                  ),
-                ),
+                 // 1. Palabra clave (Centrada arriba, Letra Capital)
+                 Text(
+                   wordCard.word.isNotEmpty
+                       ? '${wordCard.word[0].toUpperCase()}${wordCard.word.substring(1).toLowerCase()}'
+                       : '',
+                   textAlign: TextAlign.center,
+                   style: const TextStyle(
+                     color: Colors.white,
+                     fontSize: 32,
+                     fontWeight: FontWeight.bold,
+                     height: 1.1,
+                     letterSpacing: 1.5,
+                   ),
+                 ),
                 const SizedBox(height: 4),
 
                 // Fonética (Centrada debajo de la palabra)
@@ -856,7 +838,7 @@ class _WordCard extends ConsumerWidget {
                     child: GestureDetector(
                       onTap: onPlayTapped,
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: isPlaying
                               ? Colors.white.withValues(alpha: 0.3)
@@ -866,61 +848,47 @@ class _WordCard extends ConsumerWidget {
                         child: Icon(
                           isPlaying ? Icons.pause_rounded : Icons.volume_up_rounded,
                           color: Colors.white,
-                          size: 20,
+                          size: 26,
                         ),
                       ),
                     ),
                   ),
                 const SizedBox(height: 8),
 
-                // Quiz interactivo en la base
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('¡Respuesta registrada!'),
-                            duration: Duration(milliseconds: 800),
-                          ),
-                        );
-                      },
-                      child: _buildQuizButton('Sí'),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('¡Respuesta registrada!'),
-                            duration: Duration(milliseconds: 800),
-                          ),
-                        );
-                      },
-                      child: _buildQuizButton('No'),
-                    ),
-                  ],
-                ),
                 const Spacer(),
 
-                // Botones de acción en la parte inferior (Save / Practice)
+                // Botones de Quizz (Sí / No) en la parte inferior de la tarjeta con estilo de _CardAction
                 Row(
                   children: [
                     Expanded(
                       child: _CardAction(
-                        icon: Icons.bookmark_border_rounded,
-                        label: 'Save',
-                        onTap: () {},
+                        icon: Icons.check_circle_outline_rounded,
+                        label: 'Sí',
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('¡Respuesta registrada!'),
+                              duration: Duration(milliseconds: 800),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _CardAction(
-                        icon: Icons.quiz_outlined,
-                        label: 'Practice',
-                        onTap: () {},
+                        icon: Icons.cancel_outlined,
+                        label: 'No',
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('¡Respuesta registrada!'),
+                              duration: Duration(milliseconds: 800),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
