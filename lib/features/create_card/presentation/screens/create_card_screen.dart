@@ -25,7 +25,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
   final TextEditingController _wordController = TextEditingController();
   final TextEditingController _phoneticController = TextEditingController();
   final TextEditingController _definitionController = TextEditingController();
-  final TextEditingController _exampleController = TextEditingController();
+  final TextEditingController _exampleController = KeywordHighlightingController(keyword: '');
   
   String _selectedCategory = 'Sustantivo';
   String _selectedLanguage = 'Inglés';
@@ -36,6 +36,16 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
   
   int _selectedGradientIndex = 0;
   String _selectedFrameType = 'normal';
+
+  @override
+  void initState() {
+    super.initState();
+    _wordController.addListener(() {
+      if (_exampleController is KeywordHighlightingController) {
+        _exampleController.keyword = _wordController.text.trim();
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -75,6 +85,30 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
   }
 
   Future<void> _saveCard() async {
+    final word = _wordController.text.trim();
+    final example = _exampleController.text.trim();
+
+    if (example.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, ingresa una frase de ejemplo.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (!example.toLowerCase().contains(word.toLowerCase())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('La frase de ejemplo debe contener la palabra clave "$word".'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_isSaving) return;
     setState(() => _isSaving = true);
 
     try {

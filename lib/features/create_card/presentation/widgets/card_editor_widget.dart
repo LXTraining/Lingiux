@@ -10,6 +10,59 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../../core/constants/app_colors.dart';
 
+class KeywordHighlightingController extends TextEditingController {
+  String _keyword;
+
+  KeywordHighlightingController({super.text, required String keyword}) : _keyword = keyword;
+
+  String get keyword => _keyword;
+  set keyword(String value) {
+    if (_keyword != value) {
+      _keyword = value;
+      notifyListeners();
+    }
+  }
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final textVal = text;
+    if (textVal.isEmpty || _keyword.isEmpty) {
+      return super.buildTextSpan(context: context, style: style, withComposing: withComposing);
+    }
+
+    final lowerText = textVal.toLowerCase();
+    final lowerKeyword = _keyword.toLowerCase();
+    final index = lowerText.indexOf(lowerKeyword);
+
+    if (index == -1) {
+      return super.buildTextSpan(context: context, style: style, withComposing: withComposing);
+    }
+
+    final before = textVal.substring(0, index);
+    final match = textVal.substring(index, index + _keyword.length);
+    final after = textVal.substring(index + _keyword.length);
+
+    return TextSpan(
+      style: style,
+      children: [
+        TextSpan(text: before),
+        TextSpan(
+          text: match,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF86EFAC),
+          ),
+        ),
+        TextSpan(text: after),
+      ],
+    );
+  }
+}
+
 class CardEditorWidget extends StatefulWidget {
   final TextEditingController wordController;
   final TextEditingController definitionController;
@@ -72,6 +125,8 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
   Timer? _recordTimer;
   bool _isPlayingAudio = false;
 
+  final FocusNode _exampleFocusNode = FocusNode();
+
   static const List<List<Color>> _gradients = [
     [Color(0xFF6366F1), Color(0xFF3B82F6)], // Indigo-Blue
     [Color(0xFF8B5CF6), Color(0xFFEC4899)], // Purple-Pink
@@ -118,6 +173,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
     _audioRecorder.dispose();
     _audioPlayer.dispose();
     _recordTimer?.cancel();
+    _exampleFocusNode.dispose();
     super.dispose();
   }
 
@@ -236,73 +292,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
     }
   }
 
-  Widget _buildHighlightText(String text, String keyword) {
-    if (text.isEmpty) {
-      return Text(
-        'Escribe una frase de ejemplo',
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.5),
-          fontSize: 12,
-          fontStyle: FontStyle.italic,
-          fontFamily: 'Inter',
-        ),
-        textAlign: TextAlign.center,
-      );
-    }
-    if (keyword.isEmpty) {
-      return Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontFamily: 'Inter',
-        ),
-        textAlign: TextAlign.center,
-      );
-    }
 
-    final lowerText = text.toLowerCase();
-    final lowerKeyword = keyword.toLowerCase();
-    final index = lowerText.indexOf(lowerKeyword);
-
-    if (index == -1) {
-      return Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontFamily: 'Inter',
-        ),
-        textAlign: TextAlign.center,
-      );
-    }
-
-    final before = text.substring(0, index);
-    final match = text.substring(index, index + keyword.length);
-    final after = text.substring(index + keyword.length);
-
-    return RichText(
-      textAlign: TextAlign.center,
-      text: TextSpan(
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12.5,
-          fontFamily: 'Inter',
-        ),
-        children: [
-          TextSpan(text: before),
-          TextSpan(
-            text: match,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          TextSpan(text: after),
-        ],
-      ),
-    );
-  }
 
   Widget _buildFrameDecoration(String type, Widget child) {
     if (type == 'normal') {
@@ -507,10 +497,72 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Frase de Contexto
-                _buildHighlightText(
-                  widget.exampleController.text.trim(),
-                  widget.wordController.text.trim(),
+                // Frase de Contexto editable directamente en la tarjeta (disimulado)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: widget.exampleController,
+                        focusNode: _exampleFocusNode,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          fontFamily: 'Inter',
+                        ),
+                        decoration: InputDecoration(
+                          filled: false,
+                          fillColor: Colors.transparent,
+                          hoverColor: Colors.transparent,
+                          focusColor: Colors.transparent,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                          hintText: 'Escribe una frase de ejemplo',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                      ),
+                      if (widget.exampleController.text.isNotEmpty &&
+                          !widget.exampleController.text.toLowerCase().contains(widget.wordController.text.trim().toLowerCase())) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 12),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Debe incluir la palabra "${widget.wordController.text.trim()}"',
+                                  style: const TextStyle(
+                                    color: Colors.redAccent,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 // Audio / Grabación de Frase
@@ -620,6 +672,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
     final gradient = _gradients[widget.selectedGradientIndex % _gradients.length];
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -822,17 +875,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
             hintText: 'Ej: Amistoso o ingenioso',
           ),
         ),
-        const SizedBox(height: 12),
-        // Frase de Contexto
-        TextField(
-          controller: widget.exampleController,
-          decoration: InputDecoration(
-            labelText: 'Frase de Contexto',
-            hintText: 'Ej: The DOG is clever',
-            helperText: 'Escribe una frase corta donde aparezca la palabra.',
-            helperStyle: TextStyle(fontSize: 10, color: AppColors.onSurfaceMuted.withValues(alpha: 0.8)),
-          ),
-        ),
+
         const SizedBox(height: 12),
         // Pronunciación
         TextField(

@@ -452,7 +452,7 @@ class _WordCard extends ConsumerWidget {
             text: match,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              decoration: TextDecoration.underline,
+              color: Color(0xFF86EFAC),
             ),
           ),
           TextSpan(text: after),
