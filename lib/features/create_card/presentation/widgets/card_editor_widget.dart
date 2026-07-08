@@ -81,7 +81,7 @@ class CardEditorWidget extends StatefulWidget {
   final String selectedFrameType;
   final ValueChanged<String> onFrameChanged;
   final VoidCallback onBack;
-  final VoidCallback onSave;
+  final Function(Map<String, dynamic>) onSave;
   final bool isSaving;
 
   const CardEditorWidget({
@@ -114,8 +114,11 @@ class CardEditorWidget extends StatefulWidget {
 class _CardEditorWidgetState extends State<CardEditorWidget> {
   int _activeTab = 0; // 0 = Contenido, 1 = Multimedia, 2 = Estilo, 3 = Quiz
   bool _isPanelOpen = false; // El panel inicia cerrado para ver la carta grande
-  bool _enableQuiz = false;
-  String _correctQuizOption = 'Sí';
+  String _quizType = 'pregunta'; // 'pregunta' | 'acomodar' | 'completar'
+  String _quizAnswer = 'Sí'; // Para pregunta
+  String _quizHiddenWord = ''; // Para completar
+  final List<String> _quizDistractors = [];
+  final TextEditingController _newDistractorController = TextEditingController();
 
   final ImagePicker _picker = ImagePicker();
   final _audioRecorder = AudioRecorder();
@@ -162,6 +165,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
     widget.definitionController.addListener(_onTextChanged);
     widget.phoneticController.addListener(_onTextChanged);
     widget.exampleController.addListener(_onTextChanged);
+    _exampleFocusNode.addListener(_onTextChanged);
   }
 
   @override
@@ -174,6 +178,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
     _audioPlayer.dispose();
     _recordTimer?.cancel();
     _exampleFocusNode.dispose();
+    _newDistractorController.dispose();
     super.dispose();
   }
 
@@ -293,6 +298,43 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
   }
 
 
+
+  List<String> _getCompletarCandidates() {
+    final text = widget.exampleController.text.trim();
+    final keyword = widget.wordController.text.trim().toLowerCase();
+    if (text.isEmpty) return [];
+
+    final words = text
+        .replaceAll(RegExp(r'[.,\/#!$%\^&\*;:{}=\-_`~()?¿¡]'), '')
+        .split(RegExp(r'\s+'));
+
+    return words
+        .map((w) => w.trim())
+        .where((w) => w.isNotEmpty && w.toLowerCase() != keyword)
+        .toSet()
+        .toList();
+  }
+
+  void _updateWordToHideOptions() {
+    final candidates = _getCompletarCandidates();
+    if (candidates.isNotEmpty) {
+      if (_quizHiddenWord.isEmpty || !candidates.contains(_quizHiddenWord)) {
+        _quizHiddenWord = candidates.first;
+      }
+    } else {
+      _quizHiddenWord = '';
+    }
+  }
+
+  String _getFirstDistractorOrPlaceholder() {
+    return _quizDistractors.isNotEmpty ? _quizDistractors.first : 'Opción 2';
+  }
+
+  String _getCompletarText(String originalText, String hiddenWord) {
+    if (originalText.isEmpty || hiddenWord.isEmpty) return originalText;
+    final regExp = RegExp(RegExp.escape(hiddenWord), caseSensitive: false);
+    return originalText.replaceAll(regExp, '_____');
+  }
 
   Widget _buildFrameDecoration(String type, Widget child) {
     if (type == 'normal') {
@@ -503,34 +545,73 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextField(
-                        controller: widget.exampleController,
-                        focusNode: _exampleFocusNode,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12.5,
-                          fontFamily: 'Inter',
+                      if (_exampleFocusNode.hasFocus || widget.exampleController.text.trim().isEmpty)
+                        TextField(
+                          controller: widget.exampleController,
+                          focusNode: _exampleFocusNode,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontFamily: 'Inter',
+                          ),
+                          decoration: InputDecoration(
+                            filled: false,
+                            fillColor: Colors.transparent,
+                            hoverColor: Colors.transparent,
+                            focusColor: Colors.transparent,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            hintText: 'Escribe una frase de ejemplo',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                        )
+                      else
+                        GestureDetector(
+                          onTap: () {
+                            _exampleFocusNode.requestFocus();
+                          },
+                          child: Text(
+                            _quizType == 'completar' && _quizHiddenWord.isNotEmpty
+                                ? _getCompletarText(widget.exampleController.text.trim(), _quizHiddenWord)
+                                : widget.exampleController.text.trim(),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.5,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
                         ),
-                        decoration: InputDecoration(
-                          filled: false,
-                          fillColor: Colors.transparent,
-                          hoverColor: Colors.transparent,
-                          focusColor: Colors.transparent,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                          hintText: 'Escribe una frase de ejemplo',
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.4),
-                            fontSize: 12,
+                      if (_quizType == 'acomodar') ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '(Acomodar: Se escuchará por audio)',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 10,
                             fontStyle: FontStyle.italic,
                           ),
                         ),
-                        maxLines: null,
-                        keyboardType: TextInputType.multiline,
-                      ),
+                      ] else if (_quizType == 'completar' && _quizHiddenWord.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '(Completar: Se ocultará "$_quizHiddenWord")',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                       if (widget.exampleController.text.isNotEmpty &&
                           !widget.exampleController.text.toLowerCase().contains(widget.wordController.text.trim().toLowerCase())) ...[
                         const SizedBox(height: 6),
@@ -626,13 +707,52 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
                   ),
                 ),
                 // Quiz
-                if (_enableQuiz) ...[
+                if (_quizType == 'pregunta') ...[
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildQuizButton('Sí'),
-                      _buildQuizButton('No'),
+                      _buildQuizButton('Sí', _quizAnswer == 'Sí'),
+                      _buildQuizButton('No', _quizAnswer == 'No'),
+                    ],
+                  ),
+                ] else if (_quizType == 'acomodar') ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.sort_rounded, color: Colors.white, size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Acomodar Palabras',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (_quizType == 'completar') ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildQuizButton(_quizHiddenWord.isNotEmpty ? _quizHiddenWord : 'Opción 1', true),
+                      _buildQuizButton(_getFirstDistractorOrPlaceholder(), false),
                     ],
                   ),
                 ],
@@ -644,8 +764,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
     );
   }
 
-  Widget _buildQuizButton(String label) {
-    final isCorrect = _correctQuizOption == label;
+  Widget _buildQuizButton(String label, bool isCorrect) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -757,7 +876,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
                 const SizedBox(width: 20),
                 // Botón de Guardar Circular Flotante
                 GestureDetector(
-                  onTap: widget.isSaving ? null : widget.onSave,
+                  onTap: widget.isSaving ? null : _onSavePressed,
                   child: Container(
                     width: 56,
                     height: 56,
@@ -1109,64 +1228,460 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
     );
   }
 
+  void _onSavePressed() {
+    final exampleText = widget.exampleController.text.trim();
+    final keyword = widget.wordController.text.trim();
+
+    if (exampleText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, escribe una frase de ejemplo.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (!exampleText.toLowerCase().contains(keyword.toLowerCase())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('La frase de ejemplo debe incluir la palabra clave "$keyword".'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_quizType == 'pregunta') {
+      if (!exampleText.endsWith('?')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Para el ejercicio "Pregunta", la frase debe terminar con "?".'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    } else if (_quizType == 'acomodar') {
+      if (widget.recordedAudioPath == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Para el ejercicio "Acomodar", es obligatorio grabar la voz.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    } else if (_quizType == 'completar') {
+      final candidates = _getCompletarCandidates();
+      if (candidates.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('La frase de ejemplo no tiene palabras suficientes para ocultar.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+      if (_quizDistractors.length < 2) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Para el ejercicio "Completar", debes ingresar al menos 2 distractores.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    }
+
+    final quizConfig = {
+      'quiz_type': _quizType,
+      'quiz_answer': _quizAnswer,
+      'quiz_hidden_word': _quizHiddenWord,
+      'quiz_distractors': _quizDistractors,
+    };
+
+    widget.onSave(quizConfig);
+  }
+
   Widget _buildQuizPanel() {
+    final hasAudio = widget.recordedAudioPath != null;
+    final hasSentence = widget.exampleController.text.trim().isNotEmpty;
+
+    final isPreguntaEnabled = hasSentence;
+    final isAcomodarEnabled = hasSentence && hasAudio;
+    final isCompletarEnabled = _getCompletarCandidates().isNotEmpty;
+
+    // Fallback if the current selection becomes invalid
+    if (_quizType == 'acomodar' && !isAcomodarEnabled) {
+      _quizType = 'pregunta';
+    } else if (_quizType == 'completar' && !isCompletarEnabled) {
+      _quizType = 'pregunta';
+    } else if (_quizType == 'pregunta' && !isPreguntaEnabled) {
+      // keep it but it will be locked
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Configurar Auto-Quiz',
+          'Configurar Ejercicio de Quiz',
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
         ),
         const SizedBox(height: 14),
-        // Switch habilitar
-        SwitchListTile(
-          title: const Text(
-            'Habilitar botones Sí / No',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurface),
-          ),
-          subtitle: const Text(
-            'Añade dos botones interactivos en la base de la tarjeta.',
-            style: TextStyle(fontSize: 11, color: AppColors.onSurfaceMuted),
-          ),
-          value: _enableQuiz,
-          onChanged: (val) {
-            setState(() {
-              _enableQuiz = val;
-            });
-          },
-          contentPadding: EdgeInsets.zero,
-          activeThumbColor: AppColors.primary,
-          activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
+        Row(
+          children: [
+            _buildSquareTypeButton(
+              type: 'pregunta',
+              label: 'Pregunta',
+              icon: Icons.help_outline_rounded,
+              isEnabled: isPreguntaEnabled,
+            ),
+            _buildSquareTypeButton(
+              type: 'acomodar',
+              label: 'Acomodar',
+              icon: Icons.sort_rounded,
+              isEnabled: isAcomodarEnabled,
+            ),
+            _buildSquareTypeButton(
+              type: 'completar',
+              label: 'Completar',
+              icon: Icons.space_bar_rounded,
+              isEnabled: isCompletarEnabled,
+            ),
+          ],
         ),
-        if (_enableQuiz) ...[
-          const SizedBox(height: 16),
-          const Text(
-            'Respuesta Correcta',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        const SizedBox(height: 20),
+
+        if (_quizType == 'pregunta') _buildPreguntaConfig(),
+        if (_quizType == 'acomodar') _buildAcomodarConfig(),
+        if (_quizType == 'completar') _buildCompletarConfig(),
+      ],
+    );
+  }
+
+  Widget _buildSquareTypeButton({
+    required String type,
+    required String label,
+    required IconData icon,
+    required bool isEnabled,
+  }) {
+    final isSelected = _quizType == type;
+
+    Color backgroundColor = Colors.transparent;
+    Color borderColor = AppColors.border.withValues(alpha: 0.15);
+    Color contentColor = AppColors.onSurface.withValues(alpha: 0.5);
+
+    if (isSelected && isEnabled) {
+      backgroundColor = Colors.black;
+      borderColor = Colors.black;
+      contentColor = Colors.white;
+    } else if (!isEnabled) {
+      backgroundColor = AppColors.border.withValues(alpha: 0.05);
+      borderColor = AppColors.border.withValues(alpha: 0.05);
+      contentColor = AppColors.onSurface.withValues(alpha: 0.25);
+    } else {
+      backgroundColor = AppColors.border.withValues(alpha: 0.1);
+      borderColor = AppColors.border.withValues(alpha: 0.2);
+      contentColor = AppColors.onSurface;
+    }
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: isEnabled
+            ? () {
+                setState(() {
+                  _quizType = type;
+                  if (type == 'completar') {
+                    _updateWordToHideOptions();
+                  }
+                });
+              }
+            : () {
+                String reason = '';
+                if (type == 'acomodar') {
+                  reason = 'Requiere escribir una frase de ejemplo y grabar tu pronunciación de voz.';
+                } else {
+                  reason = 'Escribe primero una frase de ejemplo en la pestaña "Contenido".';
+                }
+                ScaffoldMessenger.of(context).clearSnackBars();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(reason),
+                    backgroundColor: Colors.amber[800],
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+        child: Container(
+          height: 80,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.5),
           ),
-          const SizedBox(height: 10),
-          Row(
+          child: Stack(
             children: [
-              ChoiceChip(
-                label: const Text('Sí es Correcto'),
-                selected: _correctQuizOption == 'Sí',
-                onSelected: (val) {
-                  if (val) setState(() => _correctQuizOption = 'Sí');
-                },
-              ),
-              const SizedBox(width: 10),
-              ChoiceChip(
-                label: const Text('No es Correcto'),
-                selected: _correctQuizOption == 'No',
-                onSelected: (val) {
-                  if (val) setState(() => _correctQuizOption = 'No');
-                },
+              if (!isEnabled)
+                const Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Icon(Icons.lock_rounded, size: 12, color: AppColors.onSurfaceMuted),
+                ),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: contentColor, size: 24),
+                    const SizedBox(height: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: contentColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreguntaConfig() {
+    final hasQuestionMark = widget.exampleController.text.trim().endsWith('?');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '1. Validación de Frase',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Icon(
+              hasQuestionMark ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
+              color: hasQuestionMark ? Colors.green : Colors.amber,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                hasQuestionMark
+                    ? 'La frase termina correctamente con "?"'
+                    : 'Recomendado: La frase de ejemplo debe ser una pregunta (terminar con "?").',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: hasQuestionMark ? Colors.green : AppColors.onSurfaceMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          '2. Respuesta Correcta',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            ChoiceChip(
+              label: const Text('Sí (True)'),
+              selected: _quizAnswer == 'Sí',
+              onSelected: (val) {
+                if (val) setState(() => _quizAnswer = 'Sí');
+              },
+            ),
+            const SizedBox(width: 10),
+            ChoiceChip(
+              label: const Text('No (False)'),
+              selected: _quizAnswer == 'No',
+              onSelected: (val) {
+                if (val) setState(() => _quizAnswer = 'No');
+              },
+            ),
+          ],
+        ),
       ],
     );
+  }
+
+  Widget _buildAcomodarConfig() {
+    final hasAudio = widget.recordedAudioPath != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '1. Requisito de Audio',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Icon(
+              hasAudio ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
+              color: hasAudio ? Colors.green : Colors.redAccent,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                hasAudio
+                    ? 'Audio grabado disponible.'
+                    : 'Obligatorio: Este ejercicio requiere grabar pronunciación de voz primero.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: hasAudio ? Colors.green : Colors.redAccent,
+                  fontWeight: hasAudio ? FontWeight.normal : FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _buildDistractorPanel(),
+      ],
+    );
+  }
+
+  Widget _buildCompletarConfig() {
+    final candidates = _getCompletarCandidates();
+    if (candidates.isEmpty) {
+      return const Text(
+        'Escribe una frase de ejemplo con más palabras para poder ocultar una.',
+        style: TextStyle(fontSize: 11, color: Colors.redAccent),
+      );
+    }
+
+    if (_quizHiddenWord.isEmpty || !candidates.contains(_quizHiddenWord)) {
+      _quizHiddenWord = candidates.first;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '1. Palabra a Ocultar',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _quizHiddenWord,
+          items: candidates.map((word) {
+            return DropdownMenuItem<String>(
+              value: word,
+              child: Text(word),
+            );
+          }).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() => _quizHiddenWord = val);
+            }
+          },
+          decoration: const InputDecoration(
+            labelText: 'Selecciona una palabra de la frase',
+          ),
+        ),
+        const SizedBox(height: 20),
+        _buildDistractorPanel(),
+      ],
+    );
+  }
+
+  Widget _buildDistractorPanel() {
+    final canAdd = _quizDistractors.length < 3;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '2. Palabras Distractoras (Incorrectas)',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Añade entre 1 y 3 palabras incorrectas para el ejercicio. (${_quizDistractors.length}/3)',
+          style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 10),
+        if (_quizDistractors.isNotEmpty) ...[
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _quizDistractors.map((word) {
+              return Chip(
+                label: Text(word, style: const TextStyle(fontSize: 11)),
+                visualDensity: VisualDensity.compact,
+                deleteIcon: const Icon(Icons.cancel, size: 14),
+                onDeleted: () {
+                  setState(() {
+                    _quizDistractors.remove(word);
+                  });
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _newDistractorController,
+                enabled: canAdd,
+                decoration: InputDecoration(
+                  labelText: canAdd ? 'Escribe una palabra' : 'Límite alcanzado (máx 3)',
+                  hintText: 'Ej: house',
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                onSubmitted: (_) => _addDistractor(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: canAdd ? _addDistractor : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Añadir'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _addDistractor() {
+    final text = _newDistractorController.text.trim();
+    if (text.isEmpty) return;
+    if (_quizDistractors.contains(text)) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Esa palabra ya fue agregada como distractor.')),
+      );
+      return;
+    }
+    if (_quizDistractors.length >= 3) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Límite de 3 distractores alcanzado.')),
+      );
+      return;
+    }
+    setState(() {
+      _quizDistractors.add(text);
+      _newDistractorController.clear();
+    });
   }
 }
 

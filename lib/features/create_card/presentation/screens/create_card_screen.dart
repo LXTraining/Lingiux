@@ -84,7 +84,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
     }
   }
 
-  Future<void> _saveCard() async {
+  Future<void> _saveCard(Map<String, dynamic> quizConfig) async {
     final word = _wordController.text.trim();
     final example = _exampleController.text.trim();
 
@@ -163,6 +163,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
         'canvas_design': {
           'gradient_index': _selectedGradientIndex,
           'frame_type': _selectedFrameType,
+          ...quizConfig,
         },
       });
 
