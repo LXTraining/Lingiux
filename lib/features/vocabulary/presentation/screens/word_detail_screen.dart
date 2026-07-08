@@ -304,6 +304,18 @@ class _WordCard extends ConsumerWidget {
     required this.onPlayTapped,
   });
 
+  Future<void> _playFeedbackSound(bool isCorrect) async {
+    final player = AudioPlayer();
+    try {
+      final source = isCorrect ? 'sounds/correct.mp3' : 'sounds/incorrect.wav';
+      await player.play(AssetSource(source));
+      player.onPlayerComplete.first.then((_) => player.dispose());
+    } catch (e) {
+      debugPrint('Error playing feedback sound: $e');
+      player.dispose();
+    }
+  }
+
   static const List<List<Color>> _gradients = [
     [Color(0xFF7C3AED), Color(0xFF4F46E5)],
     [Color(0xFF0284C7), Color(0xFF6366F1)],
@@ -866,10 +878,27 @@ class _WordCard extends ConsumerWidget {
                         label: 'Sí',
                         onTap: () {
                           HapticFeedback.lightImpact();
+                          final design = wordCard.canvasDesign;
+                          final correctAnswer = design?['correct_answer'] as String? ?? 'Sí';
+                          final isCorrect = correctAnswer == 'Sí';
+                          
+                          _playFeedbackSound(isCorrect);
+                          
+                          ScaffoldMessenger.of(context).clearSnackBars();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('¡Respuesta registrada!'),
-                              duration: Duration(milliseconds: 800),
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(
+                                    isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(isCorrect ? '¡Correcto! Excelente trabajo.' : '¡Incorrecto! Inténtalo de nuevo.'),
+                                ],
+                              ),
+                              backgroundColor: isCorrect ? Colors.green : Colors.redAccent,
+                              duration: const Duration(milliseconds: 1000),
                             ),
                           );
                         },
@@ -882,10 +911,27 @@ class _WordCard extends ConsumerWidget {
                         label: 'No',
                         onTap: () {
                           HapticFeedback.lightImpact();
+                          final design = wordCard.canvasDesign;
+                          final correctAnswer = design?['correct_answer'] as String? ?? 'Sí';
+                          final isCorrect = correctAnswer == 'No';
+                          
+                          _playFeedbackSound(isCorrect);
+                          
+                          ScaffoldMessenger.of(context).clearSnackBars();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('¡Respuesta registrada!'),
-                              duration: Duration(milliseconds: 800),
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(
+                                    isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(isCorrect ? '¡Correcto! Excelente trabajo.' : '¡Incorrecto! Inténtalo de nuevo.'),
+                                ],
+                              ),
+                              backgroundColor: isCorrect ? Colors.green : Colors.redAccent,
+                              duration: const Duration(milliseconds: 1000),
                             ),
                           );
                         },
