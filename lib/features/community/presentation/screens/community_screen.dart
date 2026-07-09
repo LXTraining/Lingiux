@@ -40,6 +40,12 @@ class GraphEdge {
   GraphEdge({required this.source, required this.target});
 }
 
+class GraphRepaintNotifier extends ChangeNotifier {
+  void requestRepaint() {
+    notifyListeners();
+  }
+}
+
 class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
 
@@ -57,6 +63,13 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   GraphNode? _draggedNode;
   Offset? _touchStartPos;
   bool _panEnabled = true;
+
+  // Filtros activos para Cerebro Digital
+  String _selectedCategoryFilter = 'Todos';
+  String _selectedLanguageFilter = 'Todos';
+  String _selectedFrameFilter = 'Todos';
+
+  final GraphRepaintNotifier _repaintNotifier = GraphRepaintNotifier();
 
   // Paleta de colores consistente para categorías
   static const List<Color> _categoryColors = [
@@ -207,23 +220,24 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     }
 
     // 3. Aplicar velocidad, fricción y clamping
-    setState(() {
-      for (final node in _nodes) {
-        if (node.isDragged || !_isNodeVisible(node)) continue;
+    for (final node in _nodes) {
+      if (node.isDragged || !_isNodeVisible(node)) continue;
 
-        node.position = node.position + node.velocity;
-        node.velocity = node.velocity * friction;
+      node.position = node.position + node.velocity;
+      node.velocity = node.velocity * friction;
 
-        // Mantener a los nodos flotantes dentro del canvas de 800x800
-        node.position = Offset(
-          node.position.dx.clamp(40, width - 40),
-          node.position.dy.clamp(40, height - 40),
-        );
-      }
-    });
+      // Mantener a los nodos flotantes dentro del canvas de 800x800
+      node.position = Offset(
+        node.position.dx.clamp(40, width - 40),
+        node.position.dy.clamp(40, height - 40),
+      );
+    }
+    _repaintNotifier.requestRepaint();
   }
 
   bool _isNodeVisible(GraphNode node) {
+    if (!_doesNodeMatchFilters(node)) return false;
+
     if (node.type == 'category') return true;
     final catName = (node.wordCard?.category ?? 'VOCABULARY').toUpperCase();
     final catNode = _nodes.firstWhere(
@@ -231,6 +245,58 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       orElse: () => _nodes.first,
     );
     return catNode.isExpanded;
+  }
+
+  bool _doesNodeMatchFilters(GraphNode node) {
+    if (node.type == 'category') {
+      if (_selectedCategoryFilter != 'Todos') {
+        final catName = node.label.toUpperCase();
+        final expectedCat = _getCategoryFilterKey(_selectedCategoryFilter);
+        return catName == expectedCat;
+      }
+      return true;
+    }
+
+    if (node.wordCard == null) return false;
+    final card = node.wordCard!;
+
+    // 1. Filtro de Categoría
+    if (_selectedCategoryFilter != 'Todos') {
+      final cardCat = (card.category ?? '').toUpperCase();
+      final expectedCat = _getCategoryFilterKey(_selectedCategoryFilter);
+      if (cardCat != expectedCat) return false;
+    }
+
+    // 2. Filtro de Idioma
+    if (_selectedLanguageFilter != 'Todos') {
+      final cardLang = (card.language ?? '').toUpperCase();
+      final expectedLang = _selectedLanguageFilter.toUpperCase();
+      if (cardLang != expectedLang) return false;
+    }
+
+    // 3. Filtro de Nivel (Frame)
+    if (_selectedFrameFilter != 'Todos') {
+      final cardFrame = (card.canvasDesign?['frame_type'] as String? ?? 'normal').toUpperCase();
+      final expectedFrame = _selectedFrameFilter.toUpperCase();
+      if (cardFrame != expectedFrame) return false;
+    }
+
+    return true;
+  }
+
+  String _getCategoryFilterKey(String filter) {
+    switch (filter) {
+      case 'Verbos':
+        return 'VERBO';
+      case 'Sustantivos':
+        return 'SUSTANTIVO';
+      case 'Adjetivos':
+        return 'ADJETIVO';
+      case 'Frases':
+        return 'FRASAL';
+      default:
+        return filter.toUpperCase();
+    }
   }
 
   void _rebuildEdges() {
@@ -242,7 +308,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           (n) => n.id == 'cat_$catName',
           orElse: () => _nodes.first,
         );
-        if (catNode.isExpanded) {
+        if (_isNodeVisible(node) && _isNodeVisible(catNode)) {
           _edges.add(GraphEdge(source: catNode, target: node));
         }
       }
@@ -474,42 +540,128 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     );
   }
 
+  Widget _buildCapsuleFilter<T>({
+    required String label,
+    required T value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.primary, size: 13),
+          const SizedBox(width: 5),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              color: AppColors.onSurfaceMuted,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: value,
+              items: items,
+              onChanged: (val) {
+                HapticFeedback.selectionClick();
+                onChanged(val);
+              },
+              dropdownColor: AppColors.darkBackground,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+              ),
+              icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white, size: 16),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGraphView() {
     return Column(
       children: [
-        // Leyenda superior premium
+        // Barra de filtros superior (Carrusel horizontal)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, color: AppColors.onSurfaceMuted, size: 16),
-                  SizedBox(width: 8),
-                  Text(
-                    'Usa pellizco para zoom. Toca o arrastra los nodos.',
-                    style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 11),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SizedBox(
+            height: 34,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _buildCapsuleFilter<String>(
+                  label: 'Categoría',
+                  value: _selectedCategoryFilter,
+                  icon: Icons.label_outline_rounded,
+                  items: ['Todos', 'Verbos', 'Sustantivos', 'Adjetivos', 'Frases'].map((c) {
+                    return DropdownMenuItem(
+                      value: c,
+                      child: Text(c),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedCategoryFilter = val;
+                        _rebuildEdges();
+                      });
+                    }
+                  },
                 ),
-                child: Text(
-                  '${_nodes.where((n) => n.type == 'word').length} palabras',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
+                const SizedBox(width: 8),
+                _buildCapsuleFilter<String>(
+                  label: 'Idioma',
+                  value: _selectedLanguageFilter,
+                  icon: Icons.language_rounded,
+                  items: ['Todos', 'Inglés', 'Alemán', 'Francés', 'Italiano', 'Portugués'].map((l) {
+                    return DropdownMenuItem(
+                      value: l,
+                      child: Text(l),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedLanguageFilter = val;
+                        _rebuildEdges();
+                      });
+                    }
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                _buildCapsuleFilter<String>(
+                  label: 'Nivel',
+                  value: _selectedFrameFilter,
+                  icon: Icons.workspace_premium_rounded,
+                  items: ['Todos', 'Normal', 'Bronce', 'Plata', 'Oro', 'Neón'].map((f) {
+                    return DropdownMenuItem(
+                      value: f,
+                      child: Text(f),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedFrameFilter = val;
+                        _rebuildEdges();
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
         
@@ -570,6 +722,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                       nodes: _nodes,
                       edges: _edges,
                       visibleNodes: _nodes.where(_isNodeVisible).toList(),
+                      repaint: _repaintNotifier,
                     ),
                   ),
                 ),
@@ -591,7 +744,8 @@ class VocabularyGraphPainter extends CustomPainter {
     required this.nodes,
     required this.edges,
     required this.visibleNodes,
-  });
+    required Listenable repaint,
+  }) : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {

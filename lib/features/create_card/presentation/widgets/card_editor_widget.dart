@@ -68,6 +68,7 @@ class CardEditorWidget extends StatefulWidget {
   final TextEditingController definitionController;
   final TextEditingController phoneticController;
   final TextEditingController exampleController;
+  final TextEditingController descriptionController;
   final String selectedCategory;
   final ValueChanged<String> onCategoryChanged;
   final String selectedLanguage;
@@ -90,6 +91,7 @@ class CardEditorWidget extends StatefulWidget {
     required this.definitionController,
     required this.phoneticController,
     required this.exampleController,
+    required this.descriptionController,
     required this.selectedCategory,
     required this.onCategoryChanged,
     required this.selectedLanguage,
@@ -1035,6 +1037,16 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
             );
           }).toList(),
         ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: widget.descriptionController,
+          maxLines: 2,
+          decoration: const InputDecoration(
+            labelText: 'Descripción de la carta / Explicación',
+            hintText: 'Ej: Los perros nunca son de pelaje azul...',
+            helperText: 'Aparecerá como explicación tras resolver el ejercicio.',
+          ),
+        ),
       ],
     );
   }
@@ -1299,6 +1311,7 @@ class _CardEditorWidgetState extends State<CardEditorWidget> {
       'quiz_answer': _quizAnswer,
       'quiz_hidden_word': _quizHiddenWord,
       'quiz_distractors': _quizDistractors,
+      'description': widget.descriptionController.text.trim(),
     };
 
     widget.onSave(quizConfig);

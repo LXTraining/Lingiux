@@ -457,6 +457,49 @@ class _WordCardState extends ConsumerState<_WordCard> {
     );
   }
 
+  Widget _buildDescriptionView(String description) {
+    return Container(
+      key: const ValueKey('quiz_description_view'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: Colors.greenAccent[100], size: 16),
+              const SizedBox(width: 6),
+              const Text(
+                'EXPLICACIÓN',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              height: 1.4,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFrameDecoration(String type, Widget child, Color fallbackColor) {
     if (type == 'normal') {
       return child;
@@ -766,6 +809,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
     final quizHiddenWord = design?['quiz_hidden_word'] as String? ?? '';
     final exampleSentence = widget.wordCard.exampleSentence ?? '';
     final bool showCorrectSentence = quizType == 'acomodar' && _isAnswered && _checkAcomodarCorrect();
+    final cardDescription = design?['description'] as String? ?? '';
 
     final cardBody = Container(
       decoration: BoxDecoration(
@@ -1019,250 +1063,273 @@ class _WordCardState extends ConsumerState<_WordCard> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                const SizedBox(height: 8),
-                if (quizType == 'acomodar' && !showCorrectSentence) ...[
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOut,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: _wordPool.map((word) {
-                        return _buildWordChip(
-                          word: word,
-                          isAssembled: false,
-                          onTap: () {
-                            if (_isAnswered) return;
-                            setState(() {
-                              _wordPool.remove(word);
-                              _assembledWords.add(word);
-                            });
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 350),
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SizeTransition(
+                        sizeFactor: animation,
+                        axisAlignment: -1.0,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: (_isAnswered && cardDescription.isNotEmpty)
+                      ? _buildDescriptionView(cardDescription)
+                      : Container(
+                          key: const ValueKey('quiz_controls_view'),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (quizType == 'acomodar' && !showCorrectSentence) ...[
+                                AnimatedSize(
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeInOut,
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    alignment: WrapAlignment.center,
+                                    children: _wordPool.map((word) {
+                                      return _buildWordChip(
+                                        word: word,
+                                        isAssembled: false,
+                                        onTap: () {
+                                          if (_isAnswered) return;
+                                          setState(() {
+                                            _wordPool.remove(word);
+                                            _assembledWords.add(word);
+                                          });
 
-                            final correct = _checkAcomodarCorrect();
-                            final cleanSentence = widget.wordCard.exampleSentence ?? '';
-                            final expectedWords = cleanSentence
-                                .replaceAll(RegExp(r'[.,\/#!$%\^&\*;:{}=\-_`~()?¿¡]'), '')
-                                .split(RegExp(r'\s+'))
-                                .map((w) => w.trim())
-                                .where((w) => w.isNotEmpty)
-                                .toList();
+                                          final correct = _checkAcomodarCorrect();
+                                          final cleanSentence = widget.wordCard.exampleSentence ?? '';
+                                          final expectedWords = cleanSentence
+                                              .replaceAll(RegExp(r'[.,\/#!$%\^&\*;:{}=\-_`~()?¿¡]'), '')
+                                              .split(RegExp(r'\s+'))
+                                              .map((w) => w.trim())
+                                              .where((w) => w.isNotEmpty)
+                                              .toList();
 
-                            if (_assembledWords.length == expectedWords.length) {
-                              _playFeedbackSound(correct);
-                              setState(() {
-                                _isAnswered = true;
-                              });
+                                          if (_assembledWords.length == expectedWords.length) {
+                                            _playFeedbackSound(correct);
+                                            setState(() {
+                                              _isAnswered = true;
+                                            });
 
-                              ScaffoldMessenger.of(context).clearSnackBars();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      Icon(
-                                        correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(correct ? '¡Excelente! Frase ordenada correctamente.' : '¡Incorrecto! Orden incorrecto.'),
-                                    ],
+                                            ScaffoldMessenger.of(context).clearSnackBars();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Row(
+                                                  children: [
+                                                    Icon(
+                                                      correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                                      color: Colors.white,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(correct ? '¡Excelente! Frase ordenada correctamente.' : '¡Incorrecto! Orden incorrecto.'),
+                                                  ],
+                                                ),
+                                                backgroundColor: correct ? Colors.green : Colors.redAccent,
+                                                duration: const Duration(milliseconds: 1500),
+                                              ),
+                                            );
+
+                                            if (!correct) {
+                                              Future.delayed(const Duration(milliseconds: 1600), () {
+                                                if (mounted) {
+                                                  setState(() {
+                                                    _initializeQuiz();
+                                                  });
+                                                }
+                                              });
+                                            }
+                                          }
+                                        },
+                                      );
+                                    }).toList(),
                                   ),
-                                  backgroundColor: correct ? Colors.green : Colors.redAccent,
-                                  duration: const Duration(milliseconds: 1500),
                                 ),
-                              );
+                              ] else if (quizType == 'completar') ...[
+                                Row(
+                                  children: _shuffledOptions.asMap().entries.map((entry) {
+                                    final idx = entry.key;
+                                    final option = entry.value;
+                                    final isSelected = _selectedOption == option;
+                                    final isCorrect = option.toLowerCase() == quizHiddenWord.toLowerCase();
 
-                              if (!correct) {
-                                Future.delayed(const Duration(milliseconds: 1600), () {
-                                  if (mounted) {
-                                    setState(() {
-                                      _initializeQuiz();
-                                    });
-                                  }
-                                });
-                              }
-                            }
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ] else if (quizType == 'completar') ...[
-                  Row(
-                    children: _shuffledOptions.asMap().entries.map((entry) {
-                      final idx = entry.key;
-                      final option = entry.value;
-                      final isSelected = _selectedOption == option;
-                      final isCorrect = option.toLowerCase() == quizHiddenWord.toLowerCase();
+                                    Color buttonColor = Colors.white.withValues(alpha: 0.15);
+                                    if (_selectedOption != null) {
+                                      if (isCorrect) {
+                                        buttonColor = Colors.green.withValues(alpha: 0.4);
+                                      } else if (isSelected) {
+                                        buttonColor = Colors.redAccent.withValues(alpha: 0.4);
+                                      }
+                                    }
 
-                      Color buttonColor = Colors.white.withValues(alpha: 0.15);
-                      if (_selectedOption != null) {
-                        if (isCorrect) {
-                          buttonColor = Colors.green.withValues(alpha: 0.4);
-                        } else if (isSelected) {
-                          buttonColor = Colors.redAccent.withValues(alpha: 0.4);
-                        }
-                      }
+                                    return Expanded(
+                                      child: Padding(
+                                        padding: EdgeInsets.only(left: idx == 0 ? 0 : 6, right: idx == _shuffledOptions.length - 1 ? 0 : 6),
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            if (_selectedOption != null) return;
+                                            setState(() {
+                                              _selectedOption = option;
+                                              _isAnswered = true;
+                                            });
+                                            _playFeedbackSound(isCorrect);
 
-                      return Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(left: idx == 0 ? 0 : 6, right: idx == _shuffledOptions.length - 1 ? 0 : 6),
-                          child: GestureDetector(
-                            onTap: () {
-                              if (_selectedOption != null) return;
-                              setState(() {
-                                _selectedOption = option;
-                                _isAnswered = true;
-                              });
-                              _playFeedbackSound(isCorrect);
+                                            ScaffoldMessenger.of(context).clearSnackBars();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Row(
+                                                  children: [
+                                                    Icon(
+                                                      isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                                      color: Colors.white,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(isCorrect ? '¡Correcto! Excelente trabajo.' : '¡Incorrecto! Inténtalo de nuevo.'),
+                                                  ],
+                                                ),
+                                                backgroundColor: isCorrect ? Colors.green : Colors.redAccent,
+                                                duration: const Duration(milliseconds: 1500),
+                                              ),
+                                            );
 
-                              ScaffoldMessenger.of(context).clearSnackBars();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      Icon(
-                                        isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                        color: Colors.white,
+                                            if (!isCorrect) {
+                                              Future.delayed(const Duration(milliseconds: 1600), () {
+                                                if (mounted) {
+                                                  setState(() {
+                                                    _selectedOption = null;
+                                                    _isAnswered = false;
+                                                  });
+                                                }
+                                              });
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            decoration: BoxDecoration(
+                                              color: buttonColor,
+                                              borderRadius: BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: isSelected
+                                                    ? (isCorrect ? Colors.green : Colors.redAccent)
+                                                    : Colors.white.withValues(alpha: 0.2),
+                                                width: isSelected ? 2 : 1,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              option,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(isCorrect ? '¡Correcto! Excelente trabajo.' : '¡Incorrecto! Inténtalo de nuevo.'),
-                                    ],
-                                  ),
-                                  backgroundColor: isCorrect ? Colors.green : Colors.redAccent,
-                                  duration: const Duration(milliseconds: 1500),
+                                    );
+                                  }).toList(),
                                 ),
-                              );
+                              ] else if (quizType == 'pregunta') ...[
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _CardAction(
+                                        icon: Icons.check_circle_outline_rounded,
+                                        label: 'Sí',
+                                        onTap: () {
+                                          if (_isAnswered) return;
+                                          final isCorrect = quizAnswer == 'Sí';
+                                          setState(() {
+                                            _isAnswered = true;
+                                          });
+                                          _playFeedbackSound(isCorrect);
 
-                              if (!isCorrect) {
-                                Future.delayed(const Duration(milliseconds: 1600), () {
-                                  if (mounted) {
-                                    setState(() {
-                                      _selectedOption = null;
-                                      _isAnswered = false;
-                                    });
-                                  }
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: buttonColor,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? (isCorrect ? Colors.green : Colors.redAccent)
-                                      : Colors.white.withValues(alpha: 0.2),
-                                  width: isSelected ? 2 : 1,
+                                          ScaffoldMessenger.of(context).clearSnackBars();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Row(
+                                                children: [
+                                                  Icon(
+                                                    isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                                    color: Colors.white,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(isCorrect ? '¡Correcto! Excelente trabajo.' : '¡Incorrecto! Inténtalo de nuevo.'),
+                                                ],
+                                              ),
+                                              backgroundColor: isCorrect ? Colors.green : Colors.redAccent,
+                                              duration: const Duration(milliseconds: 1500),
+                                            ),
+                                          );
+
+                                          if (!isCorrect) {
+                                            Future.delayed(const Duration(milliseconds: 1600), () {
+                                              if (mounted) {
+                                                setState(() {
+                                                  _isAnswered = false;
+                                                });
+                                              }
+                                            });
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _CardAction(
+                                        icon: Icons.cancel_outlined,
+                                        label: 'No',
+                                        onTap: () {
+                                          if (_isAnswered) return;
+                                          final isCorrect = quizAnswer == 'No';
+                                          setState(() {
+                                            _isAnswered = true;
+                                          });
+                                          _playFeedbackSound(isCorrect);
+
+                                          ScaffoldMessenger.of(context).clearSnackBars();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Row(
+                                                children: [
+                                                  Icon(
+                                                    isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                                    color: Colors.white,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(isCorrect ? '¡Correcto! Excelente trabajo.' : '¡Incorrecto! Inténtalo de nuevo.'),
+                                                ],
+                                              ),
+                                              backgroundColor: isCorrect ? Colors.green : Colors.redAccent,
+                                              duration: const Duration(milliseconds: 1500),
+                                            ),
+                                          );
+
+                                          if (!isCorrect) {
+                                            Future.delayed(const Duration(milliseconds: 1600), () {
+                                              if (mounted) {
+                                                setState(() {
+                                                  _isAnswered = false;
+                                                });
+                                              }
+                                            });
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              child: Text(
-                                option,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
+                              ],
+                            ],
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ] else if (quizType == 'pregunta') ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _CardAction(
-                          icon: Icons.check_circle_outline_rounded,
-                          label: 'Sí',
-                          onTap: () {
-                            if (_isAnswered) return;
-                            final isCorrect = quizAnswer == 'Sí';
-                            setState(() {
-                              _isAnswered = true;
-                            });
-                            _playFeedbackSound(isCorrect);
-
-                            ScaffoldMessenger.of(context).clearSnackBars();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(
-                                      isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(isCorrect ? '¡Correcto! Excelente trabajo.' : '¡Incorrecto! Inténtalo de nuevo.'),
-                                  ],
-                                ),
-                                backgroundColor: isCorrect ? Colors.green : Colors.redAccent,
-                                duration: const Duration(milliseconds: 1500),
-                              ),
-                            );
-
-                            if (!isCorrect) {
-                              Future.delayed(const Duration(milliseconds: 1600), () {
-                                if (mounted) {
-                                  setState(() {
-                                    _isAnswered = false;
-                                  });
-                                }
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _CardAction(
-                          icon: Icons.cancel_outlined,
-                          label: 'No',
-                          onTap: () {
-                            if (_isAnswered) return;
-                            final isCorrect = quizAnswer == 'No';
-                            setState(() {
-                              _isAnswered = true;
-                            });
-                            _playFeedbackSound(isCorrect);
-
-                            ScaffoldMessenger.of(context).clearSnackBars();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(
-                                      isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(isCorrect ? '¡Correcto! Excelente trabajo.' : '¡Incorrecto! Inténtalo de nuevo.'),
-                                  ],
-                                ),
-                                backgroundColor: isCorrect ? Colors.green : Colors.redAccent,
-                                duration: const Duration(milliseconds: 1500),
-                              ),
-                            );
-
-                            if (!isCorrect) {
-                              Future.delayed(const Duration(milliseconds: 1600), () {
-                                if (mounted) {
-                                  setState(() {
-                                    _isAnswered = false;
-                                  });
-                                }
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
                 const Spacer(),
               ],
             ),

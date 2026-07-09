@@ -26,6 +26,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
   final TextEditingController _phoneticController = TextEditingController();
   final TextEditingController _definitionController = TextEditingController();
   final TextEditingController _exampleController = KeywordHighlightingController(keyword: '');
+  final TextEditingController _descriptionController = TextEditingController();
   
   String _selectedCategory = 'Sustantivo';
   String _selectedLanguage = 'Inglés';
@@ -53,6 +54,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
     _phoneticController.dispose();
     _definitionController.dispose();
     _exampleController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -230,6 +232,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
         definitionController: _definitionController,
         phoneticController: _phoneticController,
         exampleController: _exampleController,
+        descriptionController: _descriptionController,
         selectedCategory: _selectedCategory,
         onCategoryChanged: (val) => setState(() => _selectedCategory = val),
         selectedLanguage: _selectedLanguage,
