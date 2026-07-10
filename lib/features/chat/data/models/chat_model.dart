@@ -12,6 +12,8 @@ class ChatModel extends ChatEntity {
     required super.isOnline,
     required super.messages,
     super.avatarUrl,
+    super.otherUserId,
+    super.nationality,
   });
 
   factory ChatModel.fromJson(Map<String, dynamic> json, String currentUserId) {
@@ -26,6 +28,8 @@ class ChatModel extends ChatEntity {
     final otherProfile = otherParticipant != null ? otherParticipant['profile'] as Map<String, dynamic> : null;
     final otherName = otherProfile?['full_name'] as String? ?? 'Usuario de Lingiux';
     final avatarUrl = otherProfile?['avatar_url'] as String?;
+    final otherUserId = otherProfile?['id'] as String?;
+    final nationality = otherProfile?['nationality'] as String?;
     
     final initials = otherName.trim().isNotEmpty
         ? otherName.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
@@ -47,6 +51,8 @@ class ChatModel extends ChatEntity {
       isOnline: false,
       messages: const [],
       avatarUrl: avatarUrl,
+      otherUserId: otherUserId,
+      nationality: nationality,
     );
   }
 }

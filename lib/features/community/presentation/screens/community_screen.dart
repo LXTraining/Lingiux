@@ -8,17 +8,21 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
+import '../../../chat/domain/entities/chat_entity.dart';
 
 class GraphNode {
   final String id;
   final String label;
-  final String type; // 'category' o 'word'
+  final String type; // 'category', 'word', 'nationality', 'person'
   final Color color;
-  final WordCardModel? wordCard; // null para categorías
+  final WordCardModel? wordCard; // null para no-palabras
+  final Map<String, dynamic>? userProfile; // null para no-personas
   Offset position;
   Offset velocity;
   bool isDragged;
-  bool isExpanded; // Solo para categorías
+  bool isExpanded; // Solo para categorías y nacionalidades
 
   GraphNode({
     required this.id,
@@ -26,6 +30,7 @@ class GraphNode {
     required this.type,
     required this.color,
     this.wordCard,
+    this.userProfile,
     required this.position,
     this.velocity = Offset.zero,
     this.isDragged = false,
@@ -58,18 +63,23 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   final List<GraphNode> _nodes = [];
   final List<GraphEdge> _edges = [];
   bool _isInitialized = false;
+  String _viewMode = 'Palabras'; // 'Palabras' o 'Personas'
+  String _lastViewMode = 'Palabras';
 
   late Ticker _ticker;
   GraphNode? _draggedNode;
   Offset? _touchStartPos;
   bool _panEnabled = true;
 
-  // Filtros activos para Cerebro Digital
+  // Filtros activos para Cerebro Digital (Originales)
   String _selectedCategoryFilter = 'Todos';
   String _selectedLanguageFilter = 'Todos';
   String _selectedFrameFilter = 'Todos';
 
   final GraphRepaintNotifier _repaintNotifier = GraphRepaintNotifier();
+
+  // Caché de imágenes de perfil cargadas dinámicamente
+  final Map<String, ui.Image> _profileImagesCache = {};
 
   // Paleta de colores consistente para categorías
   static const List<Color> _categoryColors = [
@@ -104,6 +114,41 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     }
   }
 
+  Color _getNationalityColor(String nationality) {
+    switch (nationality.toUpperCase()) {
+      case 'MÉXICO':
+      case 'MEXICO':
+        return const Color(0xFF10B981); // Verde México
+      case 'ESTADOS UNIDOS':
+      case 'USA':
+        return const Color(0xFF3B82F6); // Azul EEUU
+      case 'ALEMANIA':
+      case 'GERMANY':
+        return const Color(0xFFF59E0B); // Amber
+      case 'COLOMBIA':
+        return const Color(0xFFEAB308); // Amarillo
+      case 'ESPAÑA':
+      case 'SPAIN':
+        return const Color(0xFFEF4444); // Rojo
+      case 'FRANCIA':
+      case 'FRANCE':
+        return const Color(0xFF6366F1); // Indigo
+      case 'ITALIA':
+      case 'ITALY':
+        return const Color(0xFF14B8A6); // Teal
+      case 'PORTUGAL':
+        return const Color(0xFFEC4899); // Rosa
+      case 'REINO UNIDO':
+      case 'UK':
+        return const Color(0xFFF43F5E); // Rosado oscuro
+      case 'JAPÓN':
+      case 'JAPAN':
+        return const Color(0xFF94A3B8); // Slate
+      default:
+        return const Color(0xFF8B5CF6); // Purple
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -114,7 +159,27 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   @override
   void dispose() {
     _ticker.dispose();
+    _repaintNotifier.dispose();
     super.dispose();
+  }
+
+  void _preloadProfileImage(String url) {
+    if (url.isEmpty || _profileImagesCache.containsKey(url)) return;
+
+    try {
+      final imageProvider = NetworkImage(url);
+      final ImageStream stream = imageProvider.resolve(ImageConfiguration.empty);
+      stream.addListener(ImageStreamListener((ImageInfo info, bool _) {
+        if (mounted) {
+          setState(() {
+            _profileImagesCache[url] = info.image;
+          });
+          _repaintNotifier.requestRepaint();
+        }
+      }, onError: (dynamic exception, StackTrace? stackTrace) {
+        // Silenciar errores de red
+      }));
+    } catch (_) {}
   }
 
   void _onTick(Duration elapsed) {
@@ -124,7 +189,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     final height = 800.0;
     final center = Offset(width / 2, height / 2);
 
-    // Parámetros de física de simulación
+    // Parámetros de física de simulación originales
     const double kr = 15000.0;     // Fuerza de repulsión de Coulomb
     const double ka = 0.09;        // Constante de resorte de Hooke (atracción)
     const double gravity = 0.04;   // Gravedad hacia el centro
@@ -147,7 +212,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         final diff = nodeA.position - nodeB.position;
         final dist = diff.distance;
         
-        // Si están superpuestos o extremadamente cerca, forzar una leve separación aleatoria
         if (dist < 1.0) {
           final random = math.Random();
           nodeA.position += Offset(
@@ -157,35 +221,42 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           continue;
         }
 
-        // Determinar constante de repulsión dinámica según la relación de tipo de nodo
         double currentKr = kr;
-        if (nodeA.type == 'category' && nodeB.type == 'category') {
-          currentKr = kr * 10.0; // Fuerte repulsión entre nodos madre para alejarse
+        if ((nodeA.type == 'category' || nodeA.type == 'nationality') &&
+            (nodeB.type == 'category' || nodeB.type == 'nationality')) {
+          currentKr = kr * 10.0; // Fuerte repulsión entre nodos madre
         } else if (nodeA.type == 'category' && nodeB.type == 'word') {
           final catName = (nodeB.wordCard?.category ?? 'VOCABULARY').toUpperCase();
           if (nodeA.id != 'cat_$catName') {
-            currentKr = kr * 4.0; // Repeler fuerte si el satélite es de otro padre
+            currentKr = kr * 4.0;
           }
         } else if (nodeA.type == 'word' && nodeB.type == 'category') {
           final catName = (nodeA.wordCard?.category ?? 'VOCABULARY').toUpperCase();
           if (nodeB.id != 'cat_$catName') {
-            currentKr = kr * 4.0; // Repeler fuerte si el satélite es de otro padre
+            currentKr = kr * 4.0;
+          }
+        } else if (nodeA.type == 'nationality' && nodeB.type == 'person') {
+          final natName = (nodeB.userProfile?['nationality'] as String? ?? 'México').toUpperCase();
+          if (nodeA.id != 'nat_$natName') {
+            currentKr = kr * 4.0;
+          }
+        } else if (nodeA.type == 'person' && nodeB.type == 'nationality') {
+          final natName = (nodeA.userProfile?['nationality'] as String? ?? 'México').toUpperCase();
+          if (nodeB.id != 'nat_$natName') {
+            currentKr = kr * 4.0;
           }
         }
 
-        // Calcular distancia mínima de seguridad basada en los radios visuales + holgura (10px)
-        final double radiusA = nodeA.type == 'category' ? 24.0 : 12.0;
-        final double radiusB = nodeB.type == 'category' ? 24.0 : 12.0;
+        final double radiusA = (nodeA.type == 'category' || nodeA.type == 'nationality') ? 24.0 : 12.0;
+        final double radiusB = (nodeB.type == 'category' || nodeB.type == 'nationality') ? 24.0 : 12.0;
         final double minDistance = radiusA + radiusB + 10.0;
 
-        // Softening de la distancia para evitar que las fuerzas de repulsión tiendan a infinito
         final double safeDist = math.max(dist, minDistance);
         final force = currentKr / (safeDist * safeDist);
         fx += (diff.dx / dist) * force;
         fy += (diff.dy / dist) * force;
       }
 
-      // Atracción gravitatoria hacia el centro del espacio
       final diffToCenter = center - nodeA.position;
       final distToCenter = diffToCenter.distance;
       if (distToCenter > 1.0) {
@@ -226,7 +297,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       node.position = node.position + node.velocity;
       node.velocity = node.velocity * friction;
 
-      // Mantener a los nodos flotantes dentro del canvas de 800x800
       node.position = Offset(
         node.position.dx.clamp(40, width - 40),
         node.position.dy.clamp(40, height - 40),
@@ -236,15 +306,26 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   }
 
   bool _isNodeVisible(GraphNode node) {
-    if (!_doesNodeMatchFilters(node)) return false;
-
-    if (node.type == 'category') return true;
-    final catName = (node.wordCard?.category ?? 'VOCABULARY').toUpperCase();
-    final catNode = _nodes.firstWhere(
-      (n) => n.id == 'cat_$catName',
-      orElse: () => _nodes.first,
-    );
-    return catNode.isExpanded;
+    if (_viewMode == 'Palabras') {
+      if (node.type == 'nationality' || node.type == 'person') return false;
+      if (!_doesNodeMatchFilters(node)) return false;
+      if (node.type == 'category') return true;
+      final catName = (node.wordCard?.category ?? 'VOCABULARY').toUpperCase();
+      final catNode = _nodes.firstWhere(
+        (n) => n.id == 'cat_$catName',
+        orElse: () => _nodes.first,
+      );
+      return catNode.isExpanded;
+    } else {
+      if (node.type == 'category' || node.type == 'word') return false;
+      if (node.type == 'nationality') return true;
+      final natName = (node.userProfile?['nationality'] as String? ?? 'México').toUpperCase();
+      final natNode = _nodes.firstWhere(
+        (n) => n.id == 'nat_$natName',
+        orElse: () => _nodes.first,
+      );
+      return natNode.isExpanded;
+    }
   }
 
   bool _doesNodeMatchFilters(GraphNode node) {
@@ -301,21 +382,36 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
   void _rebuildEdges() {
     _edges.clear();
-    for (final node in _nodes) {
-      if (node.type == 'word') {
-        final catName = (node.wordCard?.category ?? 'VOCABULARY').toUpperCase();
-        final catNode = _nodes.firstWhere(
-          (n) => n.id == 'cat_$catName',
-          orElse: () => _nodes.first,
-        );
-        if (_isNodeVisible(node) && _isNodeVisible(catNode)) {
-          _edges.add(GraphEdge(source: catNode, target: node));
+    if (_viewMode == 'Palabras') {
+      for (final node in _nodes) {
+        if (node.type == 'word') {
+          final catName = (node.wordCard?.category ?? 'VOCABULARY').toUpperCase();
+          final catNode = _nodes.firstWhere(
+            (n) => n.id == 'cat_$catName',
+            orElse: () => _nodes.first,
+          );
+          if (_isNodeVisible(node) && _isNodeVisible(catNode)) {
+            _edges.add(GraphEdge(source: catNode, target: node));
+          }
+        }
+      }
+    } else {
+      for (final node in _nodes) {
+        if (node.type == 'person') {
+          final natName = (node.userProfile?['nationality'] as String? ?? 'México').toUpperCase();
+          final natNode = _nodes.firstWhere(
+            (n) => n.id == 'nat_$natName',
+            orElse: () => _nodes.first,
+          );
+          if (_isNodeVisible(node) && _isNodeVisible(natNode)) {
+            _edges.add(GraphEdge(source: natNode, target: node));
+          }
         }
       }
     }
   }
 
-  void _syncNodes(List<WordCardModel> cards) {
+  void _syncWordNodes(List<WordCardModel> cards) {
     final categories = cards
         .map((c) => (c.category ?? 'VOCABULARY').toUpperCase())
         .toSet()
@@ -366,7 +462,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       }
     }
 
-    // 3. Eliminar palabras que ya no estén en la base de datos
+    // 3. Eliminar palabras viejas
     final cardIds = cards.map((c) => c.id).toSet();
     _nodes.removeWhere((node) {
       if (node.type == 'word') {
@@ -387,10 +483,105 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     _rebuildEdges();
   }
 
+  void _syncPeopleNodes(List<ChatEntity> chats) {
+    final nationalities = chats
+        .map((c) => (c.nationality ?? 'México').toUpperCase())
+        .toSet()
+        .toList();
+
+    // 1. Agregar categorías de nacionalidades nuevas
+    for (final nat in nationalities) {
+      if (!_nodes.any((n) => n.id == 'nat_$nat' && n.type == 'nationality')) {
+        final angle = _nodes.length * 2.0 * math.pi / 8.0;
+        final center = const Offset(400, 400);
+        final pos = center + Offset(math.cos(angle) * 160, math.sin(angle) * 160);
+        _nodes.add(
+          GraphNode(
+            id: 'nat_$nat',
+            label: nat,
+            type: 'nationality',
+            color: _getNationalityColor(nat),
+            position: pos,
+          ),
+        );
+      }
+    }
+
+    // 2. Agregar personas nuevas
+    for (final chat in chats) {
+      final profileId = chat.otherUserId;
+      if (profileId == null || profileId.isEmpty) continue;
+
+      if (chat.avatarUrl != null && chat.avatarUrl!.isNotEmpty) {
+        _preloadProfileImage(chat.avatarUrl!);
+      }
+
+      if (!_nodes.any((n) => n.id == profileId && n.type == 'person')) {
+        final natName = (chat.nationality ?? 'México').toUpperCase();
+        final natNode = _nodes.firstWhere(
+          (n) => n.id == 'nat_$natName',
+          orElse: () => _nodes.first,
+        );
+
+        final random = math.Random();
+        final offset = Offset(
+          (random.nextDouble() - 0.5) * 80,
+          (random.nextDouble() - 0.5) * 80,
+        );
+
+        final profileMap = {
+          'id': profileId,
+          'full_name': chat.name,
+          'avatar_url': chat.avatarUrl ?? '',
+          'nationality': chat.nationality ?? 'México',
+        };
+
+        _nodes.add(
+          GraphNode(
+            id: profileId,
+            label: chat.name,
+            type: 'person',
+            color: natNode.color,
+            userProfile: profileMap,
+            position: natNode.position + offset,
+          ),
+        );
+      }
+    }
+
+    // 3. Eliminar personas viejas
+    final activeChatUserIds = chats
+        .map((c) => c.otherUserId)
+        .where((id) => id != null)
+        .cast<String>()
+        .toSet();
+
+    _nodes.removeWhere((node) {
+      if (node.type == 'person') {
+        return !activeChatUserIds.contains(node.id);
+      }
+      return false;
+    });
+
+    // 4. Eliminar nacionalidades vacías
+    final activeNationalities = chats
+        .map((c) => 'nat_${(c.nationality ?? 'México').toUpperCase()}')
+        .toSet();
+
+    _nodes.removeWhere((node) {
+      if (node.type == 'nationality') {
+        return !activeNationalities.contains(node.id);
+      }
+      return false;
+    });
+
+    _rebuildEdges();
+  }
+
   GraphNode? _findNodeAt(Offset pos) {
     for (final node in _nodes) {
       if (!_isNodeVisible(node)) continue;
-      final radius = node.type == 'category' ? 32.0 : 20.0;
+      final radius = (node.type == 'category' || node.type == 'nationality') ? 32.0 : 20.0;
       final dist = (node.position - pos).distance;
       if (dist <= radius + 8.0) {
         return node;
@@ -406,13 +597,39 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         node.isExpanded = !node.isExpanded;
         _rebuildEdges();
 
-        // Si se expande, le damos un empujón de velocidad física a los hijos para crear un rebote elástico
+        // Rebote elástico original restaurado
         if (node.isExpanded) {
           final random = math.Random();
           for (final child in _nodes) {
             if (child.type == 'word') {
               final catName = (child.wordCard?.category ?? 'VOCABULARY').toUpperCase();
               if ('cat_$catName' == node.id) {
+                child.position = node.position +
+                    Offset(
+                      (random.nextDouble() - 0.5) * 20,
+                      (random.nextDouble() - 0.5) * 20,
+                    );
+                child.velocity = Offset(
+                  (random.nextDouble() - 0.5) * 45,
+                  (random.nextDouble() - 0.5) * 45,
+                );
+              }
+            }
+          }
+        }
+      });
+    } else if (node.type == 'nationality') {
+      setState(() {
+        node.isExpanded = !node.isExpanded;
+        _rebuildEdges();
+
+        // Rebote elástico homólogo para Personas
+        if (node.isExpanded) {
+          final random = math.Random();
+          for (final child in _nodes) {
+            if (child.type == 'person') {
+              final natName = (child.userProfile?['nationality'] as String? ?? 'México').toUpperCase();
+              if ('nat_$natName' == node.id) {
                 child.position = node.position +
                     Offset(
                       (random.nextDouble() - 0.5) * 20,
@@ -434,18 +651,26 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           builder: (context) => WordDetailScreen(selectedWord: node.wordCard!.word),
         ),
       );
+    } else if (node.type == 'person' && node.id.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfileScreen(userId: node.id),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final wordCardsAsync = ref.watch(wordCardsProvider);
+    final chatsAsync = ref.watch(chatsProvider);
 
     return Container(
       color: AppColors.background,
       child: Stack(
         children: [
-          // Fondo degradado espacial premium
+          // Fondo degradado espacial premium original RESTAURADO
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -475,67 +700,206 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               elevation: 0,
               backgroundColor: Colors.transparent,
             ),
-            body: wordCardsAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-              error: (err, stack) => Center(
-                child: Text(
-                  'Error al inicializar red neuronal: $err',
-                  style: const TextStyle(color: AppColors.error),
+            body: Column(
+              children: [
+                // Selector premium de modo: Palabras o Personas
+                _buildViewModeToggle(),
+
+                // Carrusel de filtros (solo visible para Palabras)
+                if (_viewMode == 'Palabras') _buildFiltersCarrusel(),
+
+                Expanded(
+                  child: _viewMode == 'Palabras'
+                      ? wordCardsAsync.when(
+                          loading: () => const Center(
+                            child: CircularProgressIndicator(color: AppColors.primary),
+                          ),
+                          error: (err, stack) => Center(
+                            child: Text(
+                              'Error al inicializar red neuronal: $err',
+                              style: const TextStyle(color: AppColors.error),
+                            ),
+                          ),
+                          data: (cards) {
+                            if (cards.isEmpty) {
+                              return const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 40.0),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.bubble_chart_outlined,
+                                        size: 68,
+                                        color: AppColors.onSurfaceMuted,
+                                      ),
+                                      SizedBox(height: 20),
+                                      Text(
+                                        'Tu Red Neuronal está vacía',
+                                        style: TextStyle(
+                                          color: AppColors.onSurface,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      Text(
+                                        'Las palabras y categorías que crees mediante tus Word Cards se conectarán aquí para simular tu constelación mental de aprendizaje.',
+                                        style: TextStyle(
+                                          color: AppColors.onSurfaceMuted,
+                                          fontSize: 14,
+                                          height: 1.5,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            if (!_isInitialized || _lastViewMode != _viewMode) {
+                              _syncWordNodes(cards);
+                              _isInitialized = true;
+                              _lastViewMode = _viewMode;
+                            }
+
+                            return _buildGraphView();
+                          },
+                        )
+                      : chatsAsync.when(
+                          loading: () => const Center(
+                            child: CircularProgressIndicator(color: AppColors.primary),
+                          ),
+                          error: (err, stack) => Center(
+                            child: Text(
+                              'Error al cargar red de comunidad: $err',
+                              style: const TextStyle(color: AppColors.error),
+                            ),
+                          ),
+                          data: (chats) {
+                            if (chats.isEmpty) {
+                              return const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 40.0),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.forum_outlined,
+                                        size: 68,
+                                        color: AppColors.onSurfaceMuted,
+                                      ),
+                                      SizedBox(height: 20),
+                                      Text(
+                                        'Sin Conversaciones',
+                                        style: TextStyle(
+                                          color: AppColors.onSurface,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      Text(
+                                        'Inicia un chat con otros usuarios en el feed para ver su nacionalidad en tu Cerebro Mental.',
+                                        style: TextStyle(
+                                          color: AppColors.onSurfaceMuted,
+                                          fontSize: 14,
+                                          height: 1.5,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            if (!_isInitialized || _lastViewMode != _viewMode) {
+                              _syncPeopleNodes(chats);
+                              _isInitialized = true;
+                              _lastViewMode = _viewMode;
+                            }
+
+                            return _buildGraphView();
+                          },
+                        ),
                 ),
-              ),
-              data: (cards) {
-                if (cards.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 40.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.bubble_chart_outlined,
-                            size: 68,
-                            color: AppColors.onSurfaceMuted,
-                          ),
-                          SizedBox(height: 20),
-                          Text(
-                            'Tu Red Neuronal está vacía',
-                            style: TextStyle(
-                              color: AppColors.onSurface,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            'Las palabras y categorías que crees mediante tus Word Cards se conectarán aquí para simular tu constelación mental de aprendizaje.',
-                            style: TextStyle(
-                              color: AppColors.onSurfaceMuted,
-                              fontSize: 14,
-                              height: 1.5,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                if (!_isInitialized) {
-                  _syncNodes(cards);
-                  _isInitialized = true;
-                } else {
-                  _syncNodes(cards);
-                }
-
-                return _buildGraphView();
-              },
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildViewModeToggle() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant.withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.15), width: 0.5),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildTogglePill('Palabras', Icons.category_rounded),
+            ),
+            Expanded(
+              child: _buildTogglePill('Personas', Icons.people_alt_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTogglePill(String mode, IconData icon) {
+    final isSelected = _viewMode == mode;
+    return GestureDetector(
+      onTap: () {
+        if (_viewMode == mode) return;
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _viewMode = mode;
+          _isInitialized = false; // Forzar resincronización de nodos al cambiar de vista
+          _nodes.clear();
+          _edges.clear();
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : AppColors.onSurfaceMuted,
+              size: 14,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              mode,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.onSurfaceMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -590,78 +954,117 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     );
   }
 
+  Widget _buildFiltersCarrusel() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SizedBox(
+        height: 34,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            _buildCapsuleFilter<String>(
+              label: 'Categoría',
+              value: _selectedCategoryFilter,
+              icon: Icons.label_outline_rounded,
+              items: ['Todos', 'Verbos', 'Sustantivos', 'Adjetivos', 'Frases'].map((c) {
+                return DropdownMenuItem(
+                  value: c,
+                  child: Text(c),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedCategoryFilter = val;
+                    _rebuildEdges();
+                  });
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+            _buildCapsuleFilter<String>(
+              label: 'Idioma',
+              value: _selectedLanguageFilter,
+              icon: Icons.language_rounded,
+              items: ['Todos', 'Inglés', 'Alemán', 'Francés', 'Italiano', 'Portugués'].map((l) {
+                return DropdownMenuItem(
+                  value: l,
+                  child: Text(l),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedLanguageFilter = val;
+                    _rebuildEdges();
+                  });
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+            _buildCapsuleFilter<String>(
+              label: 'Nivel',
+              value: _selectedFrameFilter,
+              icon: Icons.workspace_premium_rounded,
+              items: ['Todos', 'Normal', 'Bronce', 'Plata', 'Oro', 'Neón'].map((f) {
+                return DropdownMenuItem(
+                  value: f,
+                  child: Text(f),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedFrameFilter = val;
+                    _rebuildEdges();
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGraphView() {
     return Column(
       children: [
-        // Barra de filtros superior (Carrusel horizontal)
+        // Leyenda superior premium original
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: SizedBox(
-            height: 34,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildCapsuleFilter<String>(
-                  label: 'Categoría',
-                  value: _selectedCategoryFilter,
-                  icon: Icons.label_outline_rounded,
-                  items: ['Todos', 'Verbos', 'Sustantivos', 'Adjetivos', 'Frases'].map((c) {
-                    return DropdownMenuItem(
-                      value: c,
-                      child: Text(c),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedCategoryFilter = val;
-                        _rebuildEdges();
-                      });
-                    }
-                  },
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: AppColors.onSurfaceMuted, size: 14),
+                  SizedBox(width: 8),
+                  Text(
+                    'Usa pellizco para zoom. Toca o arrastra los nodos.',
+                    style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 10),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
                 ),
-                const SizedBox(width: 8),
-                _buildCapsuleFilter<String>(
-                  label: 'Idioma',
-                  value: _selectedLanguageFilter,
-                  icon: Icons.language_rounded,
-                  items: ['Todos', 'Inglés', 'Alemán', 'Francés', 'Italiano', 'Portugués'].map((l) {
-                    return DropdownMenuItem(
-                      value: l,
-                      child: Text(l),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedLanguageFilter = val;
-                        _rebuildEdges();
-                      });
-                    }
-                  },
+                child: Text(
+                  _viewMode == 'Palabras'
+                      ? '${_nodes.where((n) => n.type == 'word' && _isNodeVisible(n)).length} palabras'
+                      : '${_nodes.where((n) => n.type == 'person' && _isNodeVisible(n)).length} personas',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                const SizedBox(width: 8),
-                _buildCapsuleFilter<String>(
-                  label: 'Nivel',
-                  value: _selectedFrameFilter,
-                  icon: Icons.workspace_premium_rounded,
-                  items: ['Todos', 'Normal', 'Bronce', 'Plata', 'Oro', 'Neón'].map((f) {
-                    return DropdownMenuItem(
-                      value: f,
-                      child: Text(f),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedFrameFilter = val;
-                        _rebuildEdges();
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         
@@ -709,7 +1112,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                       if (_touchStartPos != null) {
                         final delta = (event.localPosition - _touchStartPos!).distance;
                         if (delta < 6.0) {
-                          // Clic táctil sin arrastre
                           _handleNodeTap(node);
                         }
                       }
@@ -722,6 +1124,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                       nodes: _nodes,
                       edges: _edges,
                       visibleNodes: _nodes.where(_isNodeVisible).toList(),
+                      profileImages: _profileImagesCache,
                       repaint: _repaintNotifier,
                     ),
                   ),
@@ -739,11 +1142,13 @@ class VocabularyGraphPainter extends CustomPainter {
   final List<GraphNode> nodes;
   final List<GraphEdge> edges;
   final List<GraphNode> visibleNodes;
+  final Map<String, ui.Image> profileImages;
 
   VocabularyGraphPainter({
     required this.nodes,
     required this.edges,
     required this.visibleNodes,
+    required this.profileImages,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
@@ -771,9 +1176,9 @@ class VocabularyGraphPainter extends CustomPainter {
       canvas.drawLine(p1, p2, linePaint);
     }
 
-    // 2. Dibujar nodos
+    // 2. Dibujar Nodos
     for (final node in visibleNodes) {
-      final isCategory = node.type == 'category';
+      final isCategory = node.type == 'category' || node.type == 'nationality';
       final radius = isCategory ? 24.0 : 12.0;
 
       // Efecto brillo de Neón / Aura para nodos Categoría
@@ -797,8 +1202,8 @@ class VocabularyGraphPainter extends CustomPainter {
         ..style = PaintingStyle.stroke;
       canvas.drawCircle(node.position, radius, borderPaint);
 
-      // Mostrar icono expandido / colapsado en el centro de categorías
-      if (isCategory) {
+      // Dibujar contenido interior
+      if (node.type == 'category') {
         final icon = node.isExpanded ? Icons.remove_rounded : Icons.add_rounded;
         final iconSpan = TextSpan(
           text: String.fromCharCode(icon.codePoint),
@@ -819,6 +1224,59 @@ class VocabularyGraphPainter extends CustomPainter {
           canvas,
           node.position - Offset(iconPainter.width / 2, iconPainter.height / 2),
         );
+      } else if (node.type == 'nationality') {
+        final flag = _getNationalityFlag(node.label);
+        final flagSpan = TextSpan(
+          text: flag,
+          style: const TextStyle(fontSize: 16),
+        );
+        final flagPainter = TextPainter(
+          text: flagSpan,
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        flagPainter.paint(
+          canvas,
+          node.position - Offset(flagPainter.width / 2, flagPainter.height / 2),
+        );
+      } else if (node.type == 'person') {
+        final avatarUrl = node.userProfile?['avatar_url'] as String? ?? '';
+        final loadedImage = profileImages[avatarUrl];
+
+        if (loadedImage != null) {
+          canvas.save();
+          final Path clipPath = Path()
+            ..addOval(Rect.fromCircle(center: node.position, radius: radius - 0.5));
+          canvas.clipPath(clipPath);
+
+          final src = Rect.fromLTWH(0, 0, loadedImage.width.toDouble(), loadedImage.height.toDouble());
+          final dst = Rect.fromCircle(center: node.position, radius: radius - 0.5);
+          canvas.drawImageRect(loadedImage, src, dst, Paint());
+          canvas.restore();
+        } else {
+          // Fallback: iniciales
+          final initials = node.label.trim().isNotEmpty
+              ? node.label.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+              : 'U';
+          final initialsSpan = TextSpan(
+            text: initials,
+            style: const TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontFamily: 'Inter',
+            ),
+          );
+          final initialsPainter = TextPainter(
+            text: initialsSpan,
+            textDirection: TextDirection.ltr,
+          )..layout();
+
+          initialsPainter.paint(
+            canvas,
+            node.position - Offset(initialsPainter.width / 2, initialsPainter.height / 2),
+          );
+        }
       }
 
       // Dibujar texto del Label debajo del nodo
@@ -865,8 +1323,44 @@ class VocabularyGraphPainter extends CustomPainter {
     }
   }
 
+  String _getNationalityFlag(String nationality) {
+    switch (nationality.toUpperCase()) {
+      case 'MÉXICO':
+      case 'MEXICO':
+        return '🇲🇽';
+      case 'ESTADOS UNIDOS':
+      case 'USA':
+      case 'UNITED STATES':
+        return '🇺🇸';
+      case 'ALEMANIA':
+      case 'GERMANY':
+        return '🇩🇪';
+      case 'COLOMBIA':
+        return '🇨🇴';
+      case 'ESPAÑA':
+      case 'SPAIN':
+        return '🇪🇸';
+      case 'FRANCIA':
+      case 'FRANCE':
+        return '🇫🇷';
+      case 'ITALIA':
+      case 'ITALY':
+        return '🇮🇹';
+      case 'PORTUGAL':
+        return '🇵🇹';
+      case 'REINO UNIDO':
+      case 'UK':
+        return '🇬🇧';
+      case 'JAPÓN':
+      case 'JAPAN':
+        return '🇯🇵';
+      default:
+        return '🌍';
+    }
+  }
+
   @override
   bool shouldRepaint(covariant VocabularyGraphPainter oldDelegate) {
-    return true; // Obligatorio para repintar físicas elásticas frame a frame
+    return true; // Obligatorio para refrescar avatares y físicas elásticas frame a frame
   }
 }

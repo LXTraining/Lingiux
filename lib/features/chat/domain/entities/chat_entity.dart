@@ -9,6 +9,8 @@ class ChatEntity {
   final bool isOnline;
   final List<MessageEntity> messages;
   final String? avatarUrl;
+  final String? otherUserId;
+  final String? nationality;
 
   const ChatEntity({
     required this.id,
@@ -21,6 +23,8 @@ class ChatEntity {
     required this.isOnline,
     required this.messages,
     this.avatarUrl,
+    this.otherUserId,
+    this.nationality,
   });
 }
 

@@ -118,7 +118,7 @@ final chatsProvider = StreamProvider.autoDispose<List<ChatEntity>>((ref) {
               last_message_time,
               conversation_participants!inner(profile_id),
               all_participants:conversation_participants(
-                profile:profiles(id, full_name, avatar_url)
+                profile:profiles(id, full_name, avatar_url, nationality)
               )
             ''')
             .eq('conversation_participants.profile_id', user.id)
