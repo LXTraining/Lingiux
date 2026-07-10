@@ -75,7 +75,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     // Si no hay suficiente espacio arriba, mostrar debajo de la palabra
     bool isBelow = false;
     if (top < safeAreaTop + 8.0) {
-      top = globalPosition.dy + wordSize.height + spacing;
+      top = globalPosition.dy + wordSize.height;
       isBelow = true;
     }
 
@@ -95,6 +95,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         left: left,
         top: top,
         onDismiss: _dismissOverlay,
+        onShare: () {
+          _dismissOverlay();
+          _sendSharedCardMessage(cleanWord);
+        },
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity != null &&
               details.primaryVelocity!.abs() > 200) {
@@ -107,7 +111,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           controller: cardController,
           isBelow: isBelow,
           arrowLeft: arrowLeft,
-          front: _WordMiniCardFront(
+          front: WordMiniCardFront(
             word: cleanWord,
             onTap: () {
               _dismissOverlay();
@@ -139,7 +143,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               );
             },
           ),
-          back: _WordMiniCardBack(
+          back: WordMiniCardBack(
             word: cleanWord,
             onTap: () {
               _dismissOverlay();
@@ -185,6 +189,15 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final currentUserId = ref.read(authProvider).user?.id ?? '';
     ref.read(chatServiceProvider).sendMessage(widget.chat.id, currentUserId, text);
     _controller.clear();
+  }
+
+  void _sendSharedCardMessage(String word) {
+    final currentUserId = ref.read(authProvider).user?.id ?? '';
+    ref.read(chatServiceProvider).sendMessage(
+      widget.chat.id,
+      currentUserId,
+      '[CARD]:$word',
+    );
   }
 
   @override
@@ -591,12 +604,12 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _MiniCardBase extends StatelessWidget {
+class MiniCardBase extends StatelessWidget {
   final Widget child;
   final List<Widget> background;
   final VoidCallback onTap;
 
-  const _MiniCardBase({
+  const MiniCardBase({
     required this.child,
     this.background = const [],
     required this.onTap,
@@ -666,17 +679,17 @@ class _MiniCardBase extends StatelessWidget {
   }
 }
 
-class _WordMiniCardFront extends ConsumerWidget {
+class WordMiniCardFront extends ConsumerWidget {
   final String word;
   final VoidCallback onTap;
 
-  const _WordMiniCardFront({required this.word, required this.onTap});
+  const WordMiniCardFront({required this.word, required this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wordCardsAsync = ref.watch(wordCardsProvider);
 
-    return _MiniCardBase(
+    return MiniCardBase(
       onTap: onTap,
       background: wordCardsAsync.when(
         data: (wordList) {
@@ -774,17 +787,17 @@ class _WordMiniCardFront extends ConsumerWidget {
   }
 }
 
-class _WordMiniCardBack extends ConsumerWidget {
+class WordMiniCardBack extends ConsumerWidget {
   final String word;
   final VoidCallback onTap;
 
-  const _WordMiniCardBack({required this.word, required this.onTap});
+  const WordMiniCardBack({required this.word, required this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wordCardsAsync = ref.watch(wordCardsProvider);
 
-    return _MiniCardBase(
+    return MiniCardBase(
       onTap: onTap,
       child: wordCardsAsync.when(
         data: (wordList) {
@@ -982,7 +995,7 @@ class _FlippableCardState extends State<FlippableCard>
                   alignment: Alignment.center,
                   child: CustomPaint(
                     size: const Size(12, 8),
-                    painter: _ArrowPainter(
+                    painter: ArrowPainter(
                       color: const Color(0xFF7C3AED),
                       isBelow: true,
                     ),
@@ -1005,7 +1018,7 @@ class _FlippableCardState extends State<FlippableCard>
                   alignment: Alignment.center,
                   child: CustomPaint(
                     size: const Size(12, 8),
-                    painter: _ArrowPainter(
+                    painter: ArrowPainter(
                       color: const Color(0xFF5B21B6),
                       isBelow: false,
                     ),
@@ -1032,6 +1045,7 @@ class _OverlayEntrance extends StatefulWidget {
   final double left;
   final double top;
   final VoidCallback onDismiss;
+  final VoidCallback onShare;
   final GestureDragEndCallback? onHorizontalDragEnd;
 
   const _OverlayEntrance({
@@ -1040,6 +1054,7 @@ class _OverlayEntrance extends StatefulWidget {
     required this.left,
     required this.top,
     required this.onDismiss,
+    required this.onShare,
     this.onHorizontalDragEnd,
   });
 
@@ -1055,6 +1070,7 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
   late Animation<double> _slideAnimation;
   late Animation<double> _backdropOpacityAnimation;
   bool _isDismissing = false;
+  bool _showToolbar = false;
 
   @override
   void initState() {
@@ -1125,6 +1141,12 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
             top: widget.top,
             child: GestureDetector(
               onTap: () {}, // Previene cerrar al tocar dentro de la carta
+              onLongPress: () {
+                HapticFeedback.mediumImpact();
+                setState(() {
+                  _showToolbar = !_showToolbar;
+                });
+              },
               child: FadeTransition(
                 opacity: _opacityAnimation,
                 child: AnimatedBuilder(
@@ -1145,17 +1167,81 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
               ),
             ),
           ),
+          // Cinta de opciones (Toolbar) animada con suavidad al aparecer/desaparecer
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutBack,
+            left: widget.left + (96.0 / 2) - (100.0 / 2),
+            top: _showToolbar
+                ? (widget.isBelow
+                    ? widget.top + 144.0 + 8.0
+                    : widget.top - 36.0 - 8.0)
+                : (widget.isBelow
+                    ? widget.top + 144.0
+                    : widget.top - 36.0),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: _showToolbar ? 1.0 : 0.0,
+              curve: Curves.easeInOut,
+              child: IgnorePointer(
+                ignoring: !_showToolbar,
+                child: _buildToolbar(),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildToolbar() {
+    return Container(
+      width: 100,
+      height: 36,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1A30).withOpacity(0.95),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF7C3AED), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C3AED).withOpacity(0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: widget.onShare,
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.send_rounded, color: Colors.white, size: 14),
+              SizedBox(width: 6),
+              Text(
+                'Compartir',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _ArrowPainter extends CustomPainter {
+class ArrowPainter extends CustomPainter {
   final Color color;
   final bool isBelow;
 
-  _ArrowPainter({required this.color, required this.isBelow});
+  ArrowPainter({required this.color, required this.isBelow});
 
   @override
   void paint(Canvas canvas, Size size) {

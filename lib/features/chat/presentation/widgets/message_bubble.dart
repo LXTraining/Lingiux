@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/utils/formatters.dart';
+import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
+import '../screens/chat_detail_screen.dart';
 
 class MessageBubble extends StatelessWidget {
   final MessageEntity message;
@@ -15,6 +18,12 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCard = message.text.startsWith('[CARD]:');
+    if (isCard) {
+      final word = message.text.substring(7);
+      return _buildSharedCardBubble(context, word);
+    }
+
     final isMe = message.isMe;
 
     return Padding(
@@ -103,6 +112,136 @@ class MessageBubble extends StatelessWidget {
         onTap: onWordTap,
       );
     }).toList();
+  }
+
+  Widget _buildSharedCardBubble(BuildContext context, String word) {
+    final cardController = FlippableCardController();
+
+    void navigateToDetail() {
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              WordDetailScreen(selectedWord: word),
+          transitionsBuilder:
+              (context, animation, secondaryAnimation, child) {
+                return FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOut,
+                  ),
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+                      CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOut,
+                      ),
+                    ),
+                    child: child,
+                  ),
+                );
+              },
+          transitionDuration: const Duration(milliseconds: 280),
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.center,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 1. La Carta Flippable centradita con detector de deslizamiento
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragStart: (_) {}, // Bloquea el PageView del chat
+              onHorizontalDragUpdate: (_) {}, // Bloquea el PageView del chat
+              onHorizontalDragEnd: (details) {
+                if (details.primaryVelocity != null &&
+                    details.primaryVelocity!.abs() > 200) {
+                  final swipeRight = details.primaryVelocity! > 0;
+                  cardController.flip(swipeRight: swipeRight);
+                  HapticFeedback.selectionClick();
+                }
+              },
+              child: SizedBox(
+                width: 96,
+                height: 144, // 136px card + 8px arrow
+                child: FlippableCard(
+                  controller: cardController,
+                  isBelow: false, // La flecha está abajo apuntando al texto
+                  arrowLeft: 48.0, // Eje central
+                  front: WordMiniCardFront(
+                    word: word,
+                    onTap: navigateToDetail,
+                  ),
+                  back: WordMiniCardBack(
+                    word: word,
+                    onTap: navigateToDetail,
+                  ),
+                ),
+              ),
+            ),
+            
+            // 2. El globito de la palabra abajo
+            const SizedBox(height: 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF815BF5).withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                word,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+            
+            // 3. Hora y check
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  formatMessageTime(message.time),
+                  style: const TextStyle(
+                    color: AppColors.onSurfaceMuted,
+                    fontSize: 10,
+                  ),
+                ),
+                if (message.isMe) ...[
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.done_all_rounded,
+                    size: 12,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
