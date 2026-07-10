@@ -1054,44 +1054,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   Widget _buildGraphView() {
     return Column(
       children: [
-        // Leyenda superior premium original
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, color: AppColors.onSurfaceMuted, size: 14),
-                  SizedBox(width: 8),
-                  Text(
-                    'Usa pellizco para zoom. Toca o arrastra los nodos.',
-                    style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 10),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  _viewMode == 'Palabras'
-                      ? '${_nodes.where((n) => n.type == 'word' && _isNodeVisible(n)).length} palabras'
-                      : '${_nodes.where((n) => n.type == 'person' && _isNodeVisible(n)).length} personas',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        
         // Canvas del Mapa Mental Interactivo
         Expanded(
           child: LayoutBuilder(

@@ -68,8 +68,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     const spacing = 8.0;
     final safeAreaTop = MediaQuery.of(context).padding.top + kToolbarHeight;
     final safeAreaBottom = MediaQuery.of(context).padding.bottom;
-
-    double left = globalPosition.dx - cardWidth / 2;
+    final wordCenterX = globalPosition.dx;
+    double left = wordCenterX - cardWidth / 2;
     double top = globalPosition.dy - cardHeight - spacing;
 
     // Si no hay suficiente espacio arriba, mostrar debajo de la palabra
@@ -84,6 +84,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       safeAreaTop + 8.0,
       screenSize.height - cardHeight - safeAreaBottom - 16.0,
     );
+
+    final arrowLeft = (wordCenterX - left).clamp(16.0, cardWidth - 16.0);
 
     final cardController = FlippableCardController();
 
@@ -103,6 +105,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         },
         child: FlippableCard(
           controller: cardController,
+          isBelow: isBelow,
+          arrowLeft: arrowLeft,
           front: _WordMiniCardFront(
             word: cleanWord,
             onTap: () {
@@ -882,6 +886,8 @@ class FlippableCard extends StatefulWidget {
   final Widget back;
   final Duration duration;
   final FlippableCardController? controller;
+  final bool isBelow;
+  final double arrowLeft;
 
   const FlippableCard({
     super.key,
@@ -889,6 +895,8 @@ class FlippableCard extends StatefulWidget {
     required this.back,
     this.duration = const Duration(milliseconds: 250),
     this.controller,
+    required this.isBelow,
+    required this.arrowLeft,
   });
 
   @override
@@ -953,16 +961,59 @@ class _FlippableCardState extends State<FlippableCard>
           ..setEntry(3, 2, 0.002) // 3D perspective
           ..rotateY(angle);
 
-        return Transform(
-          transform: transform,
-          alignment: Alignment.center,
-          child: showFront
-              ? widget.front
-              : Transform(
-                  transform: Matrix4.identity()..rotateY(math.pi),
+        final cardWidget = showFront
+            ? widget.front
+            : Transform(
+                transform: Matrix4.identity()..rotateY(math.pi),
+                alignment: Alignment.center,
+                child: widget.back,
+              );
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.isBelow) ...[
+              // Flecha apuntando hacia arriba rotando sobre sí misma
+              Padding(
+                padding: EdgeInsets.only(left: widget.arrowLeft - 6.0),
+                child: Transform(
+                  transform: transform,
                   alignment: Alignment.center,
-                  child: widget.back,
+                  child: CustomPaint(
+                    size: const Size(12, 8),
+                    painter: _ArrowPainter(
+                      color: const Color(0xFF7C3AED),
+                      isBelow: true,
+                    ),
+                  ),
                 ),
+              ),
+            ],
+            // La tarjeta flippable rotando sobre su propio centro
+            Transform(
+              transform: transform,
+              alignment: Alignment.center,
+              child: cardWidget,
+            ),
+            if (!widget.isBelow) ...[
+              // Flecha apuntando hacia abajo rotando sobre sí misma
+              Padding(
+                padding: EdgeInsets.only(left: widget.arrowLeft - 6.0),
+                child: Transform(
+                  transform: transform,
+                  alignment: Alignment.center,
+                  child: CustomPaint(
+                    size: const Size(12, 8),
+                    painter: _ArrowPainter(
+                      color: const Color(0xFF5B21B6),
+                      isBelow: false,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         );
       },
     );
@@ -1098,4 +1149,36 @@ class _OverlayEntranceState extends State<_OverlayEntrance>
       ),
     );
   }
+}
+
+class _ArrowPainter extends CustomPainter {
+  final Color color;
+  final bool isBelow;
+
+  _ArrowPainter({required this.color, required this.isBelow});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    if (isBelow) {
+      // Triángulo apuntando hacia ARRIBA
+      path.moveTo(size.width / 2, 0);
+      path.lineTo(0, size.height);
+      path.lineTo(size.width, size.height);
+    } else {
+      // Triángulo apuntando hacia ABAJO
+      path.moveTo(0, 0);
+      path.lineTo(size.width, 0);
+      path.lineTo(size.width / 2, size.height);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
