@@ -13,7 +13,6 @@ import '../../../../../core/services/audio_service.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
-import '../../../home/presentation/providers/navigation_provider.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final ChatEntity chat;
@@ -29,6 +28,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _scrollController = ScrollController();
   OverlayEntry? _overlayEntry;
   late final PageController _pageController;
+  final Map<String, WordCardModel> _selectedCardsCache = {};
 
   @override
   void initState() {
@@ -50,14 +50,28 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     _overlayEntry = null;
   }
 
-  void _showWordCard(String word, Offset globalPosition, Size wordSize) {
+  void _showWordCard(String messageId, String word, Offset globalPosition, Size wordSize) {
     _dismissOverlay();
 
     final cleanWord = word.replaceAll(RegExp(r"[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ']"), '');
     if (cleanWord.length < 2) return;
 
     final wordList = ref.read(wordCardsProvider).value ?? [];
-    final hasCard = wordList.any((w) => w.word.toLowerCase() == cleanWord.toLowerCase());
+    
+    // Obtener todas las cartas que coinciden con esta palabra (case-insensitive)
+    final matches = wordList.where((w) => w.word.toLowerCase() == cleanWord.toLowerCase()).toList();
+    
+    WordCardModel? selectedWordCard;
+    if (matches.isNotEmpty) {
+      final cacheKey = "${messageId}_${cleanWord.toLowerCase()}";
+      if (_selectedCardsCache.containsKey(cacheKey)) {
+        selectedWordCard = _selectedCardsCache[cacheKey];
+      } else {
+        // Seleccionar aleatoriamente una de las coincidencias
+        selectedWordCard = matches[math.Random().nextInt(matches.length)];
+        _selectedCardsCache[cacheKey] = selectedWordCard!;
+      }
+    }
 
     ref.read(audioServiceProvider).playTap();
     HapticFeedback.lightImpact();
@@ -97,7 +111,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         onDismiss: _dismissOverlay,
         onShare: () {
           _dismissOverlay();
-          _sendSharedCardMessage(cleanWord);
+          _sendSharedCardMessage(cleanWord, selectedWordCard);
         },
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity != null &&
@@ -113,13 +127,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           arrowLeft: arrowLeft,
           front: WordMiniCardFront(
             word: cleanWord,
+            card: selectedWordCard,
             onTap: () {
               _dismissOverlay();
               Navigator.push(
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      WordDetailScreen(selectedWord: cleanWord),
+                      WordDetailScreen(
+                        selectedWord: cleanWord,
+                        cardId: selectedWordCard?.id,
+                      ),
                   transitionsBuilder:
                       (context, animation, secondaryAnimation, child) {
                         return FadeTransition(
@@ -145,13 +163,17 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ),
           back: WordMiniCardBack(
             word: cleanWord,
+            card: selectedWordCard,
             onTap: () {
               _dismissOverlay();
               Navigator.push(
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      WordDetailScreen(selectedWord: cleanWord),
+                      WordDetailScreen(
+                        selectedWord: cleanWord,
+                        cardId: selectedWordCard?.id,
+                      ),
                   transitionsBuilder:
                       (context, animation, secondaryAnimation, child) {
                         return FadeTransition(
@@ -191,12 +213,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     _controller.clear();
   }
 
-  void _sendSharedCardMessage(String word) {
+  void _sendSharedCardMessage(String word, WordCardModel? card) {
     final currentUserId = ref.read(authProvider).user?.id ?? '';
+    final textToSend = card != null ? '[CARD]:$word:${card.id}' : '[CARD]:$word';
     ref.read(chatServiceProvider).sendMessage(
       widget.chat.id,
       currentUserId,
-      '[CARD]:$word',
+      textToSend,
     );
   }
 
@@ -681,27 +704,88 @@ class MiniCardBase extends StatelessWidget {
 
 class WordMiniCardFront extends ConsumerWidget {
   final String word;
+  final WordCardModel? card;
   final VoidCallback onTap;
 
-  const WordMiniCardFront({required this.word, required this.onTap});
+  const WordMiniCardFront({
+    required this.word,
+    this.card,
+    required this.onTap,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final WordCardModel? matchingCard = card;
+
+    if (matchingCard != null) {
+      return MiniCardBase(
+        onTap: onTap,
+        background: [
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.70,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: CachedNetworkImage(
+                  imageUrl: matchingCard.imageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      Container(color: Colors.white.withOpacity(0.1)),
+                  errorWidget: (context, url, error) => const SizedBox(),
+                ),
+              ),
+            ),
+          ),
+        ],
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.auto_stories_outlined,
+              color: Colors.white,
+              size: 22,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.15),
+                  width: 0.5,
+                ),
+              ),
+              child: const Text(
+                'Open',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final wordCardsAsync = ref.watch(wordCardsProvider);
 
     return MiniCardBase(
       onTap: onTap,
       background: wordCardsAsync.when(
         data: (wordList) {
-          WordCardModel? matchingCard;
+          WordCardModel? fallbackCard;
           for (final w in wordList) {
             if (w.word.toLowerCase() == word.toLowerCase()) {
-              matchingCard = w;
+              fallbackCard = w;
               break;
             }
           }
 
-          if (matchingCard != null) {
+          if (fallbackCard != null) {
             return [
               Positioned.fill(
                 child: Opacity(
@@ -709,7 +793,7 @@ class WordMiniCardFront extends ConsumerWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: CachedNetworkImage(
-                      imageUrl: matchingCard.imageUrl,
+                      imageUrl: fallbackCard.imageUrl,
                       fit: BoxFit.cover,
                       placeholder: (context, url) =>
                           Container(color: Colors.white.withOpacity(0.1)),
@@ -789,31 +873,105 @@ class WordMiniCardFront extends ConsumerWidget {
 
 class WordMiniCardBack extends ConsumerWidget {
   final String word;
+  final WordCardModel? card;
   final VoidCallback onTap;
 
-  const WordMiniCardBack({required this.word, required this.onTap});
+  const WordMiniCardBack({
+    required this.word,
+    this.card,
+    required this.onTap,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final WordCardModel? matchingCard = card;
+
+    if (matchingCard != null) {
+      final definition = matchingCard.definition;
+      final phonetic = matchingCard.phonetic;
+
+      return MiniCardBase(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.g_translate_outlined,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(height: 6),
+            if (phonetic.isNotEmpty) ...[
+              Text(
+                phonetic,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 9,
+                  fontStyle: FontStyle.italic,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+            ],
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  child: Text(
+                    definition,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black45,
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Icon(
+              Icons.flip_camera_android_outlined,
+              color: Colors.white70,
+              size: 14,
+            ),
+          ],
+        ),
+      );
+    }
+
     final wordCardsAsync = ref.watch(wordCardsProvider);
 
     return MiniCardBase(
       onTap: onTap,
       child: wordCardsAsync.when(
         data: (wordList) {
-          WordCardModel? matchingCard;
+          WordCardModel? fallbackCard;
           for (final w in wordList) {
             if (w.word.toLowerCase() == word.toLowerCase()) {
-              matchingCard = w;
+              fallbackCard = w;
               break;
             }
           }
 
-          final hasCard = matchingCard != null;
+          final hasCard = fallbackCard != null;
           final definition = hasCard
-              ? matchingCard.definition
+              ? fallbackCard.definition
               : 'Esta palabra no tiene tarjeta aún. ¡Toca aquí para crearla y memorizarla!';
-          final phonetic = hasCard ? matchingCard.phonetic : '';
+          final phonetic = hasCard ? fallbackCard.phonetic : '';
 
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -829,7 +987,7 @@ class WordMiniCardBack extends ConsumerWidget {
                   phonetic,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 9,
                     fontStyle: FontStyle.italic,
                   ),

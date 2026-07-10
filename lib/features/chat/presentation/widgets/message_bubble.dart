@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/utils/formatters.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
+import '../../../vocabulary/domain/models/word_card_model.dart';
+import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../screens/chat_detail_screen.dart';
 
-class MessageBubble extends StatelessWidget {
+class MessageBubble extends ConsumerWidget {
   final MessageEntity message;
-  final Function(String, Offset, Size) onWordTap;
+  final Function(String messageId, String word, Offset globalPosition, Size wordSize) onWordTap;
 
   const MessageBubble({
     super.key,
@@ -17,11 +20,13 @@ class MessageBubble extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isCard = message.text.startsWith('[CARD]:');
     if (isCard) {
-      final word = message.text.substring(7);
-      return _buildSharedCardBubble(context, word);
+      final parts = message.text.split(':');
+      final word = parts.length > 1 ? parts[1] : '';
+      final cardId = parts.length > 2 ? parts[2] : null;
+      return _buildSharedCardBubble(context, ref, word, cardId);
     }
 
     final isMe = message.isMe;
@@ -109,20 +114,37 @@ class MessageBubble extends StatelessWidget {
           fontSize: 15,
           height: 1.45,
         ),
-        onTap: onWordTap,
+        onTap: (word, offset, size) {
+          onWordTap(message.id, word, offset, size);
+        },
       );
     }).toList();
   }
 
-  Widget _buildSharedCardBubble(BuildContext context, String word) {
+  Widget _buildSharedCardBubble(BuildContext context, WidgetRef ref, String word, String? cardId) {
     final cardController = FlippableCardController();
+    final wordCardsAsync = ref.watch(wordCardsProvider);
+
+    WordCardModel? specificCard;
+    if (wordCardsAsync.hasValue && cardId != null) {
+      final list = wordCardsAsync.value!;
+      for (final w in list) {
+        if (w.id == cardId) {
+          specificCard = w;
+          break;
+        }
+      }
+    }
 
     void navigateToDetail() {
       Navigator.push(
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
-              WordDetailScreen(selectedWord: word),
+              WordDetailScreen(
+                selectedWord: word,
+                cardId: cardId,
+              ),
           transitionsBuilder:
               (context, animation, secondaryAnimation, child) {
                 return FadeTransition(
@@ -176,10 +198,12 @@ class MessageBubble extends StatelessWidget {
                   arrowLeft: 48.0, // Eje central
                   front: WordMiniCardFront(
                     word: word,
+                    card: specificCard,
                     onTap: navigateToDetail,
                   ),
                   back: WordMiniCardBack(
                     word: word,
+                    card: specificCard,
                     onTap: navigateToDetail,
                   ),
                 ),

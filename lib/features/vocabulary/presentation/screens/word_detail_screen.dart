@@ -13,8 +13,13 @@ import '../../../profile/presentation/screens/profile_screen.dart';
 
 class WordDetailScreen extends ConsumerStatefulWidget {
   final String selectedWord;
+  final String? cardId;
 
-  const WordDetailScreen({super.key, required this.selectedWord});
+  const WordDetailScreen({
+    super.key,
+    required this.selectedWord,
+    this.cardId,
+  });
 
   @override
   ConsumerState<WordDetailScreen> createState() => _WordDetailScreenState();
@@ -156,17 +161,22 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           }
 
           // Ordenar para mostrar la palabra seleccionada primero
-          final selectedIndex = wordCards.indexWhere(
-            (w) => w.word.toLowerCase() == widget.selectedWord.toLowerCase(),
-          );
+          int selectedIndex = -1;
+          if (widget.cardId != null) {
+            selectedIndex = wordCards.indexWhere((w) => w.id == widget.cardId);
+          }
+          if (selectedIndex == -1) {
+            selectedIndex = wordCards.indexWhere(
+              (w) => w.word.toLowerCase() == widget.selectedWord.toLowerCase(),
+            );
+          }
 
           final List<WordCardModel> sortedWords = [];
           if (selectedIndex != -1) {
-            sortedWords.add(wordCards[selectedIndex]);
+            final targetCard = wordCards[selectedIndex];
+            sortedWords.add(targetCard);
             sortedWords.addAll(
-              wordCards.where(
-                (w) => w.word.toLowerCase() != widget.selectedWord.toLowerCase(),
-              ),
+              wordCards.where((w) => w.id != targetCard.id),
             );
           } else {
             // Si la palabra no está (por ejemplo si es inventada/custom), agregar un placeholder temporal
