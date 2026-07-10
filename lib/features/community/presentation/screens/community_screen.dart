@@ -11,6 +11,7 @@ import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../../chat/domain/entities/chat_entity.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class GraphNode {
   final String id;
@@ -78,8 +79,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
   final GraphRepaintNotifier _repaintNotifier = GraphRepaintNotifier();
 
-  // Caché de imágenes de perfil cargadas dinámicamente
+  // Caché de imágenes de profile cargadas dinámicamente
   final Map<String, ui.Image> _profileImagesCache = {};
+
+  // Caché de imágenes de banderas pre-cargadas (PictureInfo vectorial)
+  final Map<String, PictureInfo> _flagPicturesCache = {};
 
   // Paleta de colores consistente para categorías
   static const List<Color> _categoryColors = [
@@ -179,6 +183,25 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       }, onError: (dynamic exception, StackTrace? stackTrace) {
         // Silenciar errores de red
       }));
+    } catch (_) {}
+  }
+
+  void _preloadFlagImage(String nationality) {
+    final asset = _getNationalityFlagAsset(nationality);
+    if (asset.isEmpty || _flagPicturesCache.containsKey(asset)) return;
+
+    try {
+      final SvgAssetLoader loader = SvgAssetLoader(asset);
+      vg.loadPicture(loader, null).then((pictureInfo) {
+        if (mounted) {
+          setState(() {
+            _flagPicturesCache[asset] = pictureInfo;
+          });
+          _repaintNotifier.requestRepaint();
+        }
+      }).catchError((_) {
+        // Silenciar errores de carga
+      });
     } catch (_) {}
   }
 
@@ -491,6 +514,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
     // 1. Agregar categorías de nacionalidades nuevas
     for (final nat in nationalities) {
+      _preloadFlagImage(nat);
       if (!_nodes.any((n) => n.id == 'nat_$nat' && n.type == 'nationality')) {
         final angle = _nodes.length * 2.0 * math.pi / 8.0;
         final center = const Offset(400, 400);
@@ -1125,6 +1149,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                       edges: _edges,
                       visibleNodes: _nodes.where(_isNodeVisible).toList(),
                       profileImages: _profileImagesCache,
+                      flagImages: _flagPicturesCache,
                       repaint: _repaintNotifier,
                     ),
                   ),
@@ -1143,12 +1168,14 @@ class VocabularyGraphPainter extends CustomPainter {
   final List<GraphEdge> edges;
   final List<GraphNode> visibleNodes;
   final Map<String, ui.Image> profileImages;
+  final Map<String, PictureInfo> flagImages;
 
   VocabularyGraphPainter({
     required this.nodes,
     required this.edges,
     required this.visibleNodes,
     required this.profileImages,
+    required this.flagImages,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
@@ -1225,20 +1252,46 @@ class VocabularyGraphPainter extends CustomPainter {
           node.position - Offset(iconPainter.width / 2, iconPainter.height / 2),
         );
       } else if (node.type == 'nationality') {
-        final flag = _getNationalityFlag(node.label);
-        final flagSpan = TextSpan(
-          text: flag,
-          style: const TextStyle(fontSize: 16),
-        );
-        final flagPainter = TextPainter(
-          text: flagSpan,
-          textDirection: TextDirection.ltr,
-        )..layout();
+        final asset = _getNationalityFlagAsset(node.label);
+        final loadedFlag = flagImages[asset];
 
-        flagPainter.paint(
-          canvas,
-          node.position - Offset(flagPainter.width / 2, flagPainter.height / 2),
-        );
+        if (loadedFlag != null) {
+          canvas.save();
+          // Clip circular
+          final Path clipPath = Path()
+            ..addOval(Rect.fromCircle(center: node.position, radius: radius - 0.5));
+          canvas.clipPath(clipPath);
+
+          // Dibujar la picture de la bandera escalada para cubrir todo el círculo (BoxFit.cover)
+          final svgSize = loadedFlag.size;
+          final double nodeDiameter = (radius - 0.5) * 2;
+          final double scaleX = nodeDiameter / svgSize.width;
+          final double scaleY = nodeDiameter / svgSize.height;
+          final double scale = math.max(scaleX, scaleY);
+
+          final double dx = node.position.dx - (svgSize.width * scale) / 2;
+          final double dy = node.position.dy - (svgSize.height * scale) / 2;
+
+          canvas.translate(dx, dy);
+          canvas.scale(scale);
+          canvas.drawPicture(loadedFlag.picture);
+          canvas.restore();
+        } else {
+          final flag = _getNationalityFlag(node.label);
+          final flagSpan = TextSpan(
+            text: flag,
+            style: const TextStyle(fontSize: 16),
+          );
+          final flagPainter = TextPainter(
+            text: flagSpan,
+            textDirection: TextDirection.ltr,
+          )..layout();
+
+          flagPainter.paint(
+            canvas,
+            node.position - Offset(flagPainter.width / 2, flagPainter.height / 2),
+          );
+        }
       } else if (node.type == 'person') {
         final avatarUrl = node.userProfile?['avatar_url'] as String? ?? '';
         final loadedImage = profileImages[avatarUrl];
@@ -1362,5 +1415,31 @@ class VocabularyGraphPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant VocabularyGraphPainter oldDelegate) {
     return true; // Obligatorio para refrescar avatares y físicas elásticas frame a frame
+  }
+}
+
+String _getNationalityFlagAsset(String nationality) {
+  switch (nationality.toUpperCase()) {
+    case 'MÉXICO':
+    case 'MEXICO':
+      return 'assets/flags/mx.svg';
+    case 'ESTADOS UNIDOS':
+    case 'USA':
+    case 'UNITED STATES':
+      return 'assets/flags/us.svg';
+    case 'ALEMANIA':
+    case 'GERMANY':
+      return 'assets/flags/de.svg';
+    case 'FRANCIA':
+    case 'FRANCE':
+      return 'assets/flags/fr.svg';
+    case 'ITALIA':
+    case 'ITALY':
+      return 'assets/flags/it.svg';
+    case 'BRASIL':
+    case 'BRAZIL':
+      return 'assets/flags/br.svg';
+    default:
+      return ''; // No asset available
   }
 }
