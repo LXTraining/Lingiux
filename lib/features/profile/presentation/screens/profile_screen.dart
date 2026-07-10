@@ -35,19 +35,48 @@ final userBioProvider = FutureProvider.family.autoDispose<String, String>((ref, 
   return '¡Hola! Estoy aprendiendo idiomas en Lingiux 🚀';
 });
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   final String? userId;
   const ProfileScreen({super.key, this.userId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  int _activeTabIndex = 0; // 0 for grid, 1 for stats
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _activeTabIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  String _getFlagPath(String lang) {
+    final lower = lang.toLowerCase();
+    if (lower == 'inglés' || lower == 'english' || lower == 'en') {
+      return 'assets/flags/us.svg';
+    }
+    return 'assets/flags/mx.svg';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    final isOwnProfile = userId == null || userId == user?.id;
-    final effectiveUserId = userId ?? user?.id;
+    final isOwnProfile = widget.userId == null || widget.userId == user?.id;
+    final effectiveUserId = widget.userId ?? user?.id;
 
-    final profileAsync = ref.watch(profileFamilyProvider(userId));
-    final userCardsAsync = ref.watch(userWordCardsFamilyProvider(userId));
+    final profileAsync = ref.watch(profileFamilyProvider(widget.userId));
+    final userCardsAsync = ref.watch(userWordCardsFamilyProvider(widget.userId));
+    final resolvedCardsAsync = ref.watch(resolvedCardsFamilyProvider(widget.userId));
     final bioAsync = ref.watch(userBioProvider(effectiveUserId ?? ''));
 
     // Print de depuración para saber si las cartas se cargaron bien
@@ -130,11 +159,13 @@ class ProfileScreen extends ConsumerWidget {
               color: AppColors.primary,
               onRefresh: () async {
                 HapticFeedback.mediumImpact();
-                ref.invalidate(profileFamilyProvider(userId));
-                ref.invalidate(userWordCardsFamilyProvider(userId));
+                ref.invalidate(profileFamilyProvider(widget.userId));
+                ref.invalidate(userWordCardsFamilyProvider(widget.userId));
+                ref.invalidate(resolvedCardsFamilyProvider(widget.userId));
                 try {
-                  await ref.read(profileFamilyProvider(userId).future);
-                  await ref.read(userWordCardsFamilyProvider(userId).future);
+                  await ref.read(profileFamilyProvider(widget.userId).future);
+                  await ref.read(userWordCardsFamilyProvider(widget.userId).future);
+                  await ref.read(resolvedCardsFamilyProvider(widget.userId).future);
                 } catch (_) {}
               },
               child: SingleChildScrollView(
@@ -420,74 +451,81 @@ class ProfileScreen extends ConsumerWidget {
                         children: [
                           if (isOwnProfile) ...[
                             // Ajustes (Engranaje)
-                            GestureDetector(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                                );
-                              },
-                              child: Container(
-                                height: 38,
-                                width: 38,
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceVariant,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppColors.border, width: 0.5),
-                                ),
-                                child: const Icon(
-                                  Icons.settings_outlined,
-                                  color: AppColors.onSurface,
-                                  size: 18,
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                                  );
+                                },
+                                child: Container(
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceVariant,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: AppColors.border, width: 0.5),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.settings_outlined,
+                                        color: AppColors.onSurface,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'AJUSTES',
+                                        style: TextStyle(
+                                          color: AppColors.onSurface,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            // Botón de Editar Perfil
+                            const SizedBox(width: 12),
+                            // Compartir
                             Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () {
+                              child: GestureDetector(
+                                onTap: () {
                                   HapticFeedback.lightImpact();
                                 },
-                                icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 16),
-                                label: const Text(
-                                  'EDITAR PERFIL',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  elevation: 0,
-                                  minimumSize: const Size.fromHeight(38),
-                                  shape: RoundedRectangleBorder(
+                                child: Container(
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceVariant,
                                     borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: AppColors.border, width: 0.5),
                                   ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Compartir
-                            GestureDetector(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                              },
-                              child: Container(
-                                height: 38,
-                                width: 38,
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceVariant,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppColors.border, width: 0.5),
-                                ),
-                                child: const Icon(
-                                  Icons.share_rounded,
-                                  color: AppColors.onSurface,
-                                  size: 18,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.share_rounded,
+                                        color: AppColors.onSurface,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'COMPARTIR',
+                                        style: TextStyle(
+                                          color: AppColors.onSurface,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -512,7 +550,7 @@ class ProfileScreen extends ConsumerWidget {
                                     final chatService = ref.read(chatServiceProvider);
                                     final convId = await chatService.getOrCreateConversation(
                                       currentUserId,
-                                      userId!,
+                                      widget.userId!,
                                     );
 
                                     if (context.mounted) {
@@ -576,7 +614,7 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ),
 
-                  // Pestañas de Selección de Vista (Grid de publicaciones activo)
+                  // Pestañas de Selección de Vista (Grid de publicaciones e intereses estilo Plato)
                   const SizedBox(height: 20),
                   Container(
                     decoration: const BoxDecoration(
@@ -588,27 +626,64 @@ class ProfileScreen extends ConsumerWidget {
                     child: Row(
                       children: [
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: const BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(color: AppColors.primary, width: 2),
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _activeTabIndex = 0;
+                              });
+                              _pageController.animateToPage(
+                                0,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: _activeTabIndex == 0 ? AppColors.primary : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: const Icon(
-                              Icons.grid_on_rounded,
-                              color: AppColors.primary,
-                              size: 22,
+                              child: Icon(
+                                Icons.grid_on_rounded,
+                                color: _activeTabIndex == 0 ? AppColors.primary : AppColors.onSurfaceMuted,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: const Icon(
-                              Icons.bookmark_border_rounded,
-                              color: AppColors.onSurfaceMuted,
-                              size: 22,
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _activeTabIndex = 1;
+                              });
+                              _pageController.animateToPage(
+                                1,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: _activeTabIndex == 1 ? AppColors.primary : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.style_outlined,
+                                color: _activeTabIndex == 1 ? AppColors.primary : AppColors.onSurfaceMuted,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),
@@ -616,76 +691,304 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
 
-                  // Cuadrícula de 3 columnas de las cartas del usuario
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: userCardsAsync.when(
-                      loading: () => const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: CircularProgressIndicator(color: AppColors.primary),
-                        ),
-                      ),
-                      error: (err, stack) => Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Text(
-                            'Error al cargar tus cartas: $err',
-                            style: const TextStyle(color: AppColors.error),
-                          ),
-                        ),
-                      ),
-                      data: (cards) {
-                        if (cards.isEmpty) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(48.0),
-                              child: Column(
-                                children: [
-                                  Icon(Icons.style_outlined, size: 48, color: AppColors.onSurfaceMuted),
-                                  SizedBox(height: 12),
-                                  Text(
-                                    'No has creado ninguna tarjeta aún.',
-                                    style: TextStyle(color: AppColors.onSurfaceMuted),
-                                    textAlign: TextAlign.center,
+                  // Contenido Condicional de la pestaña seleccionada con PageView y altura dinámica
+                  userCardsAsync.when(
+                    loading: () => const SizedBox(),
+                    error: (err, stack) => const SizedBox(),
+                    data: (userCards) {
+                      return resolvedCardsAsync.when(
+                        loading: () => const SizedBox(),
+                        error: (err, stack) => const SizedBox(),
+                        data: (resolvedCards) {
+                          // Calcular altura de la cuadrícula
+                          final screenWidth = MediaQuery.of(context).size.width;
+                          final cardWidth = (screenWidth - 28) / 3;
+                          final cardHeight = cardWidth * 1.5;
+                          final rows = (userCards.length / 3).ceil();
+                          final gridHeight = userCards.isEmpty
+                              ? 200.0
+                              : (rows * (cardHeight + 6)) + 24.0;
+
+                          // Calcular altura de estadísticas
+                          final Set<String> languages = {};
+                          for (final c in userCards) {
+                            if (c.language != null && c.language!.isNotEmpty) {
+                              languages.add(c.language!);
+                            }
+                          }
+                          for (final rc in resolvedCards) {
+                            final String? lang = rc['language'] as String?;
+                            if (lang != null && lang.isNotEmpty) {
+                              languages.add(lang);
+                            }
+                          }
+                          if (languages.isEmpty) {
+                            languages.add('Inglés');
+                          }
+                          final languageList = languages.toList()..sort();
+                          final statsHeight = (languageList.length * 80.0) + 60.0;
+
+                          final contentHeight = _activeTabIndex == 0 ? gridHeight : statsHeight;
+
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeInOut,
+                            height: contentHeight,
+                            child: PageView(
+                              controller: _pageController,
+                              onPageChanged: (index) {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  _activeTabIndex = index;
+                                });
+                              },
+                              children: [
+                                // Página 0: Grid de Cartas Creadas
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: userCards.isEmpty
+                                      ? const Center(
+                                          child: Padding(
+                                            padding: EdgeInsets.all(48.0),
+                                            child: Column(
+                                              children: [
+                                                Icon(Icons.style_outlined, size: 48, color: AppColors.onSurfaceMuted),
+                                                SizedBox(height: 12),
+                                                Text(
+                                                  'No has creado ninguna tarjeta aún.',
+                                                  style: TextStyle(color: AppColors.onSurfaceMuted),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        )
+                                      : GridView.builder(
+                                          shrinkWrap: true,
+                                          physics: const NeverScrollableScrollPhysics(),
+                                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                            crossAxisCount: 3,
+                                            crossAxisSpacing: 6,
+                                            mainAxisSpacing: 6,
+                                            childAspectRatio: 2 / 3,
+                                          ),
+                                          itemCount: userCards.length,
+                                          itemBuilder: (context, index) {
+                                            final card = userCards[index];
+                                            return GestureDetector(
+                                              onTap: () {
+                                                HapticFeedback.selectionClick();
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) => WordDetailScreen(selectedWord: card.word),
+                                                  ),
+                                                );
+                                              },
+                                              child: Stack(
+                                                children: [
+                                                  _MiniWordCard(
+                                                    wordCard: card,
+                                                    gradientIndex: index,
+                                                  ),
+                                                  Positioned(
+                                                    top: 6,
+                                                    right: 6,
+                                                    child: Container(
+                                                      width: 18,
+                                                      height: 18,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        border: Border.all(color: Colors.white, width: 1.5),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black.withValues(alpha: 0.15),
+                                                            blurRadius: 4,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: ClipOval(
+                                                        child: SvgPicture.asset(
+                                                          _getFlagPath(card.language ?? 'Inglés'),
+                                                          fit: BoxFit.cover,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                ),
+                                // Página 1: Estadísticas por Idioma
+                                Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'STATS',
+                                        style: TextStyle(
+                                          color: AppColors.onSurfaceMuted,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.0,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ListView.separated(
+                                        shrinkWrap: true,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        itemCount: languageList.length,
+                                        separatorBuilder: (context, index) => const Divider(
+                                          color: AppColors.border,
+                                          height: 24,
+                                          thickness: 0.5,
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final lang = languageList[index];
+                                          final resolvedCount = resolvedCards
+                                              .where((rc) => rc['language']?.toLowerCase() == lang.toLowerCase())
+                                              .length;
+                                          final totalCount = userCards
+                                              .where((uc) => uc.language?.toLowerCase() == lang.toLowerCase())
+                                              .length;
+
+                                          final int level = (resolvedCount / 3).floor() + 1;
+                                          final double progress = (resolvedCount % 3) / 3.0;
+
+                                          String rankTitle = 'Novato';
+                                          if (level == 2) rankTitle = 'Aprendiz';
+                                          if (level == 3) rankTitle = 'Avanzado';
+                                          if (level == 4) rankTitle = 'Experto';
+                                          if (level >= 5) rankTitle = 'Leyenda';
+
+                                          return Row(
+                                            crossAxisAlignment: CrossAxisAlignment.center,
+                                            children: [
+                                              Stack(
+                                                clipBehavior: Clip.none,
+                                                children: [
+                                                  Container(
+                                                    width: 44,
+                                                    height: 44,
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(color: Colors.white, width: 2),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.black.withValues(alpha: 0.1),
+                                                          blurRadius: 6,
+                                                          offset: const Offset(0, 2),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: ClipOval(
+                                                      child: SvgPicture.asset(
+                                                        _getFlagPath(lang),
+                                                        fit: BoxFit.cover,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Positioned(
+                                                    bottom: -2,
+                                                    right: -2,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(3),
+                                                      decoration: const BoxDecoration(
+                                                        color: Color(0xFF2563EB),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Text(
+                                                        level.toString(),
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 8,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                      children: [
+                                                        Text(
+                                                          lang,
+                                                          style: const TextStyle(
+                                                            color: AppColors.onSurface,
+                                                            fontSize: 14,
+                                                            fontWeight: FontWeight.bold,
+                                                            fontFamily: 'Inter',
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          'Nivel $level',
+                                                          style: const TextStyle(
+                                                            color: AppColors.onSurface,
+                                                            fontSize: 12,
+                                                            fontWeight: FontWeight.w600,
+                                                            fontFamily: 'Inter',
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    ClipRRect(
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      child: LinearProgressIndicator(
+                                                        value: progress,
+                                                        color: const Color(0xFF22C55E),
+                                                        backgroundColor: AppColors.border.withValues(alpha: 0.3),
+                                                        minHeight: 8,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                      children: [
+                                                        Text(
+                                                          rankTitle,
+                                                          style: const TextStyle(
+                                                            color: AppColors.onSurfaceMuted,
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          'Resueltas: $resolvedCount  Creadas: $totalCount',
+                                                          style: const TextStyle(
+                                                            color: AppColors.onSurfaceMuted,
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           );
-                        }
-
-                        return GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            crossAxisSpacing: 6,
-                            mainAxisSpacing: 6,
-                            childAspectRatio: 2 / 3,
-                          ),
-                          itemCount: cards.length,
-                          itemBuilder: (context, index) {
-                            final card = cards[index];
-                            return GestureDetector(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => WordDetailScreen(selectedWord: card.word),
-                                  ),
-                                );
-                              },
-                              child: _MiniWordCard(
-                                wordCard: card,
-                                gradientIndex: index,
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                        },
+                      );
+                    },
                   ),
                   const SizedBox(height: 24),
                 ],

@@ -10,6 +10,7 @@ import '../providers/vocabulary_provider.dart';
 import '../../../profile/presentation/providers/settings_provider.dart';
 import '../../../home/presentation/providers/navigation_provider.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 class WordDetailScreen extends ConsumerStatefulWidget {
   final String selectedWord;
@@ -324,6 +325,24 @@ class _WordCardState extends ConsumerState<_WordCard> {
   List<String> _shuffledOptions = [];
   String? _selectedOption;
   bool _isAnswered = false;
+
+  Future<void> _recordCorrectCard() async {
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final user = ref.read(authProvider).user;
+      if (user == null) return;
+
+      await supabase.from('resolved_cards').upsert({
+        'user_id': user.id,
+        'card_id': widget.wordCard.id,
+        'language': widget.wordCard.language ?? 'Inglés',
+      }, onConflict: 'user_id,card_id');
+      
+      debugPrint('Tarjeta resuelta registrada: ${widget.wordCard.word}');
+    } catch (e) {
+      debugPrint('Error al registrar tarjeta resuelta: $e');
+    }
+  }
 
   static const List<List<Color>> _gradients = [
     [Color(0xFF7C3AED), Color(0xFF4F46E5)],
@@ -1145,7 +1164,9 @@ class _WordCardState extends ConsumerState<_WordCard> {
                                               ),
                                             );
 
-                                            if (!correct) {
+                                            if (correct) {
+                                              _recordCorrectCard();
+                                            } else {
                                               Future.delayed(const Duration(milliseconds: 1600), () {
                                                 if (mounted) {
                                                   setState(() {
@@ -1207,7 +1228,9 @@ class _WordCardState extends ConsumerState<_WordCard> {
                                               ),
                                             );
 
-                                            if (!isCorrect) {
+                                            if (isCorrect) {
+                                              _recordCorrectCard();
+                                            } else {
                                               Future.delayed(const Duration(milliseconds: 1600), () {
                                                 if (mounted) {
                                                   setState(() {
@@ -1278,7 +1301,9 @@ class _WordCardState extends ConsumerState<_WordCard> {
                                             ),
                                           );
 
-                                          if (!isCorrect) {
+                                          if (isCorrect) {
+                                            _recordCorrectCard();
+                                          } else {
                                             Future.delayed(const Duration(milliseconds: 1600), () {
                                               if (mounted) {
                                                 setState(() {
@@ -1321,7 +1346,9 @@ class _WordCardState extends ConsumerState<_WordCard> {
                                             ),
                                           );
 
-                                          if (!isCorrect) {
+                                          if (isCorrect) {
+                                            _recordCorrectCard();
+                                          } else {
                                             Future.delayed(const Duration(milliseconds: 1600), () {
                                               if (mounted) {
                                                 setState(() {

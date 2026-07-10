@@ -42,3 +42,28 @@ final userWordCardsFamilyProvider = FutureProvider.family.autoDispose<List<WordC
 final userWordCardsProvider = FutureProvider.autoDispose<List<WordCardModel>>((ref) async {
   return ref.watch(userWordCardsFamilyProvider(null).future);
 });
+
+final resolvedCardsFamilyProvider = FutureProvider.family.autoDispose<List<Map<String, dynamic>>, String?>((ref, userId) async {
+  final effectiveUserId = userId ?? ref.watch(authProvider).user?.id;
+  if (effectiveUserId == null) {
+    return [];
+  }
+
+  final supabase = ref.read(supabaseClientProvider);
+  
+  try {
+    final response = await supabase
+        .from('resolved_cards')
+        .select()
+        .eq('user_id', effectiveUserId)
+        .order('created_at', ascending: false);
+        
+    return List<Map<String, dynamic>>.from(response as List);
+  } catch (e) {
+    return [];
+  }
+});
+
+final resolvedCardsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  return ref.watch(resolvedCardsFamilyProvider(null).future);
+});
