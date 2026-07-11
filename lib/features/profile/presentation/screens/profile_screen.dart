@@ -632,11 +632,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               setState(() {
                                 _activeTabIndex = 0;
                               });
-                              _pageController.animateToPage(
-                                0,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
+                              if (_pageController.hasClients) {
+                                _pageController.animateToPage(
+                                  0,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -663,11 +665,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               setState(() {
                                 _activeTabIndex = 1;
                               });
-                              _pageController.animateToPage(
-                                1,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
+                              if (_pageController.hasClients) {
+                                _pageController.animateToPage(
+                                  1,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),

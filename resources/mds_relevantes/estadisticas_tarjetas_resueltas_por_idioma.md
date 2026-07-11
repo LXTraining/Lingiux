@@ -205,7 +205,27 @@ El diseño visual se construyó meticulosamente con Vanilla CSS/Flutter Widgets 
 
 ---
 
-## 📚 6. Librerías y Dependencias Utilizadas
+## 🐛 6. Manejo de Excepciones y Robustez del PageController
+
+Durante la integración del deslizamiento por gestos, identificamos un escenario donde el usuario podía gatillar un error fatal al interactuar con las pestañas superiores antes de que los datos asíncronos terminasen de cargar:
+
+*   **Excepción**: `_AssertionError ('package:flutter/src/widgets/page_view.dart': Failed assertion: line 189 pos 12: 'positions.isNotEmpty': PageController is not attached to a PageView.)`
+*   **Causa**: Si el listado de tarjetas está en estado de carga (`loading`), `userCardsAsync.when` retorna un widget vacío (`const SizedBox()`), lo cual remueve temporalmente el widget `PageView` de la jerarquía activa de Flutter. Al presionar el botón de la pestaña en este estado, el controlador `_pageController` intentaba animar una página inexistente al no estar acoplado a ningún cliente activo en el árbol.
+*   **Solución**: Añadimos una guarda defensiva utilizando la propiedad `.hasClients` expuesta por `PageController` antes de invocar cualquier transición animada:
+    ```dart
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+    ```
+    Si el `PageView` no está montado aún, la animación se omite con seguridad y la actualización del estado (`setState`) gestiona el cambio instantáneo de pestaña de forma reactiva una vez completada la carga.
+
+---
+
+## 📚 7. Librerías y Dependencias Utilizadas
 
 1.  **`supabase_flutter`**: Facilita la conexión directa con las API REST de Supabase Postgrest y el envío de peticiones `upsert` seguras mediante OAuth JWT.
 2.  **`flutter_riverpod`**: Administrador de estado reactivo global para almacenar en caché las tarjetas resueltas, facilitando su invalidación y recarga asíncrona mediante el `RefreshIndicator`.
