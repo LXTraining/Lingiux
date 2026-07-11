@@ -11,15 +11,18 @@ import '../../../profile/presentation/providers/settings_provider.dart';
 import '../../../home/presentation/providers/navigation_provider.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../chat/presentation/providers/chat_puzzle_provider.dart';
 
 class WordDetailScreen extends ConsumerStatefulWidget {
   final String selectedWord;
   final String? cardId;
+  final String? conversationId;
 
   const WordDetailScreen({
     super.key,
     required this.selectedWord,
     this.cardId,
+    this.conversationId,
   });
 
   @override
@@ -289,6 +292,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                         gradientIndex: index,
                         isPlaying: _isPlaying && _playingAudioUrl == card.audioUrl,
                         onPlayTapped: () => _toggleAudio(card.audioUrl),
+                        conversationId: widget.conversationId,
                       ),
                     );
                   },
@@ -307,12 +311,14 @@ class _WordCard extends ConsumerStatefulWidget {
   final int gradientIndex;
   final bool isPlaying;
   final VoidCallback onPlayTapped;
+  final String? conversationId;
 
   const _WordCard({
     required this.wordCard,
     required this.gradientIndex,
     required this.isPlaying,
     required this.onPlayTapped,
+    this.conversationId,
   });
 
   @override
@@ -337,6 +343,10 @@ class _WordCardState extends ConsumerState<_WordCard> {
         'card_id': widget.wordCard.id,
         'language': widget.wordCard.language ?? 'Inglés',
       }, onConflict: 'user_id,card_id');
+      
+      if (widget.conversationId != null) {
+        await incrementPuzzlePoints(supabase, widget.conversationId!);
+      }
       
       debugPrint('Tarjeta resuelta registrada: ${widget.wordCard.word}');
     } catch (e) {

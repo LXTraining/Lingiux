@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../widgets/message_bubble.dart';
 import '../providers/chat_provider.dart';
+import '../providers/chat_puzzle_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
@@ -137,6 +138,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       WordDetailScreen(
                         selectedWord: cleanWord,
                         cardId: selectedWordCard?.id,
+                        conversationId: widget.chat.id,
                       ),
                   transitionsBuilder:
                       (context, animation, secondaryAnimation, child) {
@@ -173,6 +175,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       WordDetailScreen(
                         selectedWord: cleanWord,
                         cardId: selectedWordCard?.id,
+                        conversationId: widget.chat.id,
                       ),
                   transitionsBuilder:
                       (context, animation, secondaryAnimation, child) {
@@ -309,6 +312,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) => MessageBubble(
                     message: messages[index],
+                    conversationId: widget.chat.id,
                     onWordTap: _showWordCard,
                   ),
                 );
@@ -404,69 +408,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 ),
               ),
               const SizedBox(height: 48),
-              // Premium Placeholder Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF815BF5).withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.insights_rounded,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Próximamente',
-                      style: TextStyle(
-                        color: AppColors.onSurface,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Aquí encontrarás estadísticas de conversación, vocabulario aprendido en común y opciones de personalización.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.onSurfaceMuted,
-                        fontSize: 14,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // Rompecabezas Compartido
+              _ChatPuzzleWidget(conversationId: widget.chat.id),
               const SizedBox(height: 40),
               // Back hint
               Row(
@@ -581,6 +524,420 @@ class _InputBarState extends State<_InputBar> {
       ),
     );
   }
+}
+
+
+
+class _ChatPuzzleWidget extends ConsumerWidget {
+  final String conversationId;
+
+  const _ChatPuzzleWidget({
+    required this.conversationId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final puzzleAsync = ref.watch(chatPuzzleProvider(conversationId));
+
+    return puzzleAsync.when(
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      ),
+      error: (err, stack) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            'Error al cargar rompecabezas: $err',
+            style: const TextStyle(color: AppColors.error),
+          ),
+        ),
+      ),
+      data: (puzzle) {
+        if (puzzle == null) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
+        }
+
+        final points = puzzle['points'] as int;
+        final totalPieces = puzzle['total_pieces'] as int;
+        final imageUrl = puzzle['image_url'] as String;
+        final List<int> pieceOrder = List<int>.from(puzzle['piece_order'] as List);
+
+        final int unlockedCount = (points ~/ 3).clamp(0, totalPieces);
+        final Set<int> unlockedPieces = pieceOrder.take(unlockedCount).toSet();
+        final bool isCompleted = unlockedCount >= totalPieces;
+
+        // Progress metrics
+        final double overallProgress = unlockedCount / totalPieces;
+        final int pointsToNextPiece = 3 - (points % 3);
+        final String progressText = isCompleted 
+            ? '¡Rompecabezas completado!' 
+            : 'Faltan $pointsToNextPiece pts para la siguiente pieza (1 respuesta correcta = 1 pt)';
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'ROMPECABEZAS COMPARTIDO',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  Text(
+                    '$unlockedCount / $totalPieces piezas',
+                    style: const TextStyle(
+                      color: AppColors.onSurfaceMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Jigsaw Grid Layout
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final puzzleWidth = constraints.maxWidth;
+                  final puzzleHeight = puzzleWidth * 3 / 4; // Aspect Ratio 4:3
+                  final xCount = 4;
+                  final yCount = 3;
+                  final pieceWidth = puzzleWidth / xCount;
+                  final pieceHeight = puzzleHeight / yCount;
+
+                  return Container(
+                    width: puzzleWidth,
+                    height: puzzleHeight,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border, width: 0.5),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Stack(
+                        children: [
+                          // Base Full Image
+                          Positioned.fill(
+                            child: CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: AppColors.surfaceVariant,
+                                child: const Center(
+                                  child: CircularProgressIndicator(color: AppColors.primary),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => const Icon(Icons.broken_image),
+                            ),
+                          ),
+
+                          // Covering grid of locked pieces and borders
+                          for (int y = 0; y < yCount; y++)
+                            for (int x = 0; x < xCount; x++) ...[
+                              // Grid Cell
+                              _buildGridCell(
+                                x: x,
+                                y: y,
+                                xCount: xCount,
+                                yCount: yCount,
+                                pieceWidth: pieceWidth,
+                                pieceHeight: pieceHeight,
+                                index: y * xCount + x,
+                                unlockedPieces: unlockedPieces,
+                              ),
+                            ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Progress bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: overallProgress,
+                  color: const Color(0xFF22C55E),
+                  backgroundColor: AppColors.border.withValues(alpha: 0.3),
+                  minHeight: 8,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                progressText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.onSurfaceMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                ),
+              ),
+
+              if (isCompleted) ...[
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    HapticFeedback.mediumImpact();
+                    final supabase = ref.read(supabaseClientProvider);
+                    await resetPuzzle(supabase, conversationId);
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+                  label: const Text(
+                    'CARGAR NUEVO ROMPECABEZAS',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGridCell({
+    required int x,
+    required int y,
+    required int xCount,
+    required int yCount,
+    required double pieceWidth,
+    required double pieceHeight,
+    required int index,
+    required Set<int> unlockedPieces,
+  }) {
+    final isUnlocked = unlockedPieces.contains(index);
+
+    return Positioned(
+      left: x * pieceWidth,
+      top: y * pieceHeight,
+      width: pieceWidth,
+      height: pieceHeight,
+      child: Stack(
+        children: [
+          // Locked Piece Overlay
+          if (!isUnlocked)
+            Positioned.fill(
+              child: ClipPath(
+                clipper: JigsawPieceClipper(
+                  x: x,
+                  y: y,
+                  xCount: xCount,
+                  yCount: yCount,
+                ),
+                child: Container(
+                  color: AppColors.background.withValues(alpha: 0.96),
+                  child: Center(
+                    child: Icon(
+                      Icons.lock_outline_rounded,
+                      size: 16,
+                      color: AppColors.onSurfaceMuted.withValues(alpha: 0.35),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Interlocking borders painted on top (both locked and unlocked)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: JigsawBorderPainter(
+                  x: x,
+                  y: y,
+                  xCount: xCount,
+                  yCount: yCount,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class JigsawPieceClipper extends CustomClipper<Path> {
+  final int x;
+  final int y;
+  final int xCount;
+  final int yCount;
+
+  JigsawPieceClipper({
+    required this.x,
+    required this.y,
+    required this.xCount,
+    required this.yCount,
+  });
+
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final w = size.width;
+    final h = size.height;
+
+    // Start at top-left
+    path.moveTo(0, 0);
+
+    // 1. Top edge
+    if (y == 0) {
+      path.lineTo(w, 0);
+    } else {
+      final isTab = ((x + (y - 1)) % 2 == 0);
+      _drawHorizontalTab(path, 0, w, w, h, isTab, top: true);
+    }
+
+    // 2. Right edge
+    if (x == xCount - 1) {
+      path.lineTo(w, h);
+    } else {
+      final isTab = ((x + y) % 2 == 0);
+      _drawVerticalTab(path, w, 0, h, w, isTab, right: true);
+    }
+
+    // 3. Bottom edge
+    if (y == yCount - 1) {
+      path.lineTo(0, h);
+    } else {
+      final isTab = ((x + y) % 2 == 0);
+      _drawHorizontalTab(path, w, 0, w, h, isTab, top: false);
+    }
+
+    // 4. Left edge
+    if (x == 0) {
+      path.lineTo(0, 0);
+    } else {
+      final isTab = (((x - 1) + y) % 2 == 0);
+      _drawVerticalTab(path, 0, h, 0, 0, isTab, right: false);
+    }
+
+    path.close();
+    return path;
+  }
+
+  void _drawHorizontalTab(Path path, double startX, double endX, double w, double h, bool isTab, {required bool top}) {
+    final direction = top ? (isTab ? -1.0 : 1.0) : (isTab ? 1.0 : -1.0);
+    final length = endX - startX;
+    final centerY = top ? 0.0 : h;
+    final tabSize = h * 0.18; // tab height
+
+    final p0 = Offset(startX + length * 0.35, centerY);
+    final p1 = Offset(startX + length * 0.35, centerY + tabSize * direction);
+    final p2 = Offset(startX + length * 0.45, centerY + tabSize * direction);
+    final p3 = Offset(startX + length * 0.45, centerY + tabSize * 0.6 * direction);
+    
+    final p4 = Offset(startX + length * 0.5, centerY + tabSize * 1.5 * direction); // tip of tab
+    
+    final p5 = Offset(startX + length * 0.55, centerY + tabSize * 0.6 * direction);
+    final p6 = Offset(startX + length * 0.55, centerY + tabSize * direction);
+    final p7 = Offset(startX + length * 0.65, centerY + tabSize * direction);
+    final p8 = Offset(startX + length * 0.65, centerY);
+
+    path.lineTo(p0.dx, p0.dy);
+    path.cubicTo(p1.dx, p1.dy, p2.dx, p2.dy, p3.dx, p3.dy);
+    path.cubicTo(p4.dx, p4.dy, p4.dx, p4.dy, p5.dx, p5.dy);
+    path.cubicTo(p6.dx, p6.dy, p7.dx, p7.dy, p8.dx, p8.dy);
+    path.lineTo(endX, centerY);
+  }
+
+  void _drawVerticalTab(Path path, double startX, double startY, double endY, double w, bool isTab, {required bool right}) {
+    final direction = right ? (isTab ? 1.0 : -1.0) : (isTab ? -1.0 : 1.0);
+    final length = endY - startY; // positive going down
+    final centerX = right ? w : 0.0;
+    final tabSize = w * 0.18;
+
+    final p0 = Offset(centerX, startY + length * 0.35);
+    final p1 = Offset(centerX + tabSize * direction, startY + length * 0.35);
+    final p2 = Offset(centerX + tabSize * direction, startY + length * 0.45);
+    final p3 = Offset(centerX + tabSize * 0.6 * direction, startY + length * 0.45);
+    
+    final p4 = Offset(centerX + tabSize * 1.5 * direction, startY + length * 0.5); // tip
+    
+    final p5 = Offset(centerX + tabSize * 0.6 * direction, startY + length * 0.55);
+    final p6 = Offset(centerX + tabSize * direction, startY + length * 0.55);
+    final p7 = Offset(centerX + tabSize * direction, startY + length * 0.65);
+    final p8 = Offset(centerX, startY + length * 0.65);
+
+    path.lineTo(p0.dx, p0.dy);
+    path.cubicTo(p1.dx, p1.dy, p2.dx, p2.dy, p3.dx, p3.dy);
+    path.cubicTo(p4.dx, p4.dy, p4.dx, p4.dy, p5.dx, p5.dy);
+    path.cubicTo(p6.dx, p6.dy, p7.dx, p7.dy, p8.dx, p8.dy);
+    path.lineTo(centerX, endY);
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class JigsawBorderPainter extends CustomPainter {
+  final int x;
+  final int y;
+  final int xCount;
+  final int yCount;
+
+  JigsawBorderPainter({
+    required this.x,
+    required this.y,
+    required this.xCount,
+    required this.yCount,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final clipper = JigsawPieceClipper(x: x, y: y, xCount: xCount, yCount: yCount);
+    final path = clipper.getClip(size);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _Avatar extends StatelessWidget {

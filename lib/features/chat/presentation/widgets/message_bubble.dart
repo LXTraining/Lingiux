@@ -11,11 +11,13 @@ import '../screens/chat_detail_screen.dart';
 
 class MessageBubble extends ConsumerWidget {
   final MessageEntity message;
+  final String conversationId;
   final Function(String messageId, String word, Offset globalPosition, Size wordSize) onWordTap;
 
   const MessageBubble({
     super.key,
     required this.message,
+    required this.conversationId,
     required this.onWordTap,
   });
 
@@ -144,6 +146,7 @@ class MessageBubble extends ConsumerWidget {
               WordDetailScreen(
                 selectedWord: word,
                 cardId: cardId,
+                conversationId: conversationId,
               ),
           transitionsBuilder:
               (context, animation, secondaryAnimation, child) {
