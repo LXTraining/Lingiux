@@ -331,14 +331,14 @@ List<String> _getLanguagesForChat(ChatEntity chat) {
   }
 }
 
-class _ChatListTile extends StatelessWidget {
+class _ChatListTile extends ConsumerWidget {
   final ChatEntity chat;
   final VoidCallback onTap;
 
   const _ChatListTile({required this.chat, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final avatarColor =
         AppColors.avatarColors[chat.avatarColorIndex % AppColors.avatarColors.length];
     final hasUnread = chat.unreadCount > 0;
@@ -453,7 +453,7 @@ class _ChatListTile extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                chat.lastMessage,
+                                _formatLastMessage(chat, ref.watch(authProvider).user?.id ?? ''),
                                 style: TextStyle(
                                   color: hasUnread
                                       ? AppColors.onSurface
@@ -519,6 +519,16 @@ class _ChatListTile extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _formatLastMessage(ChatEntity chat, String currentUserId) {
+    if (chat.lastMessage.startsWith('[CARD]:')) {
+      final isMe = chat.lastMessageSenderId == currentUserId;
+      return isMe 
+          ? 'Has compartido una tarjeta' 
+          : '${chat.name} ha compartido una tarjeta';
+    }
+    return chat.lastMessage;
   }
 }
 

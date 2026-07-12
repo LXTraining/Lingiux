@@ -12,6 +12,7 @@ class ChatEntity {
   final String? otherUserId;
   final String? nationality;
   final String activeNationality;
+  final String? lastMessageSenderId;
 
   const ChatEntity({
     required this.id,
@@ -27,6 +28,7 @@ class ChatEntity {
     this.otherUserId,
     this.nationality,
     this.activeNationality = 'us',
+    this.lastMessageSenderId,
   });
 }
 

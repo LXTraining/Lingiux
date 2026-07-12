@@ -30,6 +30,7 @@ class ChatService {
     await _supabase.from('conversations').update({
       'last_message': text.trim(),
       'last_message_time': now.toIso8601String(),
+      'last_message_sender_id': senderId,
     }).eq('id', conversationId);
   }
 
@@ -129,9 +130,11 @@ final chatsProvider = StreamProvider.autoDispose<List<ChatEntity>>((ref) {
               last_message,
               last_message_time,
               active_nationality,
+              last_message_sender_id,
               conversation_participants!inner(profile_id),
               all_participants:conversation_participants(
                 profile:profiles(id, full_name, avatar_url, nationality)
+              )
               )
             ''')
             .eq('conversation_participants.profile_id', user.id)
