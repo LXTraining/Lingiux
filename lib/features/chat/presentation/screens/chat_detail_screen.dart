@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../widgets/message_bubble.dart';
 import '../providers/chat_provider.dart';
@@ -30,6 +31,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   OverlayEntry? _overlayEntry;
   late final PageController _pageController;
   final Map<String, WordCardModel> _selectedCardsCache = {};
+  bool _isFlagRibbonOpen = false;
 
   @override
   void initState() {
@@ -228,20 +230,27 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final chatsListAsync = ref.watch(chatsProvider);
+    final chatsList = chatsListAsync.value?.cast<ChatEntity>();
+    final chatEntity = chatsList?.firstWhere(
+      (c) => c.id == widget.chat.id,
+      orElse: () => widget.chat,
+    ) ?? widget.chat;
+
     return GestureDetector(
       onTap: _dismissOverlay,
       child: PageView(
         controller: _pageController,
         physics: const BouncingScrollPhysics(),
         children: [
-          _buildConversationPage(context),
+          _buildConversationPage(context, chatEntity),
           _buildInfoPage(context),
         ],
       ),
     );
   }
 
-  Widget _buildConversationPage(BuildContext context) {
+  Widget _buildConversationPage(BuildContext context, ChatEntity chatEntity) {
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -273,9 +282,19 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.videocam_outlined),
-            onPressed: () {},
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() {
+                _isFlagRibbonOpen = !_isFlagRibbonOpen;
+              });
+            },
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                child: _buildFlagCircle(chatEntity.activeNationality, size: 28),
+              ),
+            ),
           ),
           IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
           IconButton(
@@ -292,6 +311,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       ),
       body: Column(
         children: [
+          if (_isFlagRibbonOpen) _buildFlagRibbon(context, chatEntity),
           Expanded(
             child: ref.watch(messagesProvider(widget.chat.id)).when(
               data: (messages) {
@@ -323,6 +343,91 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ),
           _InputBar(controller: _controller, onSend: _sendMessage),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFlagCircle(String nationality, {double size = 26}) {
+    final flagPath = 'assets/flags/${nationality.toLowerCase()}.svg';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 4,
+            offset: const Offset(0, 1.5),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: SvgPicture.asset(
+          flagPath,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholderBuilder: (_) => Container(color: Colors.grey[300]),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFlagRibbon(BuildContext context, ChatEntity chatEntity) {
+    final currentNationality = chatEntity.activeNationality;
+    final nationalities = ['us', 'mx', 'fr', 'de', 'it', 'br'];
+
+    return Container(
+      height: 62,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: const Border(
+          bottom: BorderSide(color: AppColors.border, width: 0.8),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        itemCount: nationalities.length,
+        itemBuilder: (context, index) {
+          final nat = nationalities[index];
+          final isSelected = nat.toLowerCase() == currentNationality.toLowerCase();
+
+          return GestureDetector(
+            onTap: () async {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _isFlagRibbonOpen = false;
+              });
+              await ref.read(chatServiceProvider).updateActiveNationality(chatEntity.id, nat);
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : Colors.transparent,
+                    width: 2.0,
+                  ),
+                ),
+                child: _buildFlagCircle(nat, size: 32),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -14,6 +14,7 @@ class ChatModel extends ChatEntity {
     super.avatarUrl,
     super.otherUserId,
     super.nationality,
+    super.activeNationality,
   });
 
   factory ChatModel.fromJson(Map<String, dynamic> json, String currentUserId) {
@@ -30,6 +31,7 @@ class ChatModel extends ChatEntity {
     final avatarUrl = otherProfile?['avatar_url'] as String?;
     final otherUserId = otherProfile?['id'] as String?;
     final nationality = otherProfile?['nationality'] as String?;
+    final activeNationality = json['active_nationality'] as String? ?? 'us';
     
     final initials = otherName.trim().isNotEmpty
         ? otherName.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
@@ -53,6 +55,7 @@ class ChatModel extends ChatEntity {
       avatarUrl: avatarUrl,
       otherUserId: otherUserId,
       nationality: nationality,
+      activeNationality: activeNationality,
     );
   }
 }

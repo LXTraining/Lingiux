@@ -33,6 +33,18 @@ class ChatService {
     }).eq('id', conversationId);
   }
 
+  // Actualizar la nacionalidad/idioma activo de la conversación
+  Future<void> updateActiveNationality(String conversationId, String nationality) async {
+    try {
+      await _supabase
+          .from('conversations')
+          .update({'active_nationality': nationality})
+          .eq('id', conversationId);
+    } catch (e) {
+      // Silently catch
+    }
+  }
+
   // Buscar perfiles de otros usuarios para chatear
   Future<List<Map<String, dynamic>>> searchProfiles(String currentUserId, String query) async {
     if (query.trim().isEmpty) return [];
@@ -116,6 +128,7 @@ final chatsProvider = StreamProvider.autoDispose<List<ChatEntity>>((ref) {
               id,
               last_message,
               last_message_time,
+              active_nationality,
               conversation_participants!inner(profile_id),
               all_participants:conversation_participants(
                 profile:profiles(id, full_name, avatar_url, nationality)
