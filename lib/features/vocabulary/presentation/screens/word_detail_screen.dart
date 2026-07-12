@@ -685,6 +685,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: gradient,
@@ -851,6 +852,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
     final cardDescription = design?['description'] as String? ?? '';
 
     final cardBody = Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: gradient,

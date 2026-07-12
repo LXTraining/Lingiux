@@ -1109,6 +1109,7 @@ class MiniCardBase extends StatelessWidget {
         child: Container(
           width: 96,
           height: 136,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF7C3AED), Color(0xFF5B21B6)],
