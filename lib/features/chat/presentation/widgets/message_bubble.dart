@@ -171,13 +171,20 @@ class MessageBubble extends ConsumerWidget {
       );
     }
 
+    final isMe = message.isMe;
+
     return Align(
-      alignment: Alignment.center,
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        padding: EdgeInsets.only(
+          top: 8,
+          bottom: 8,
+          left: isMe ? 56 : 16,
+          right: isMe ? 16 : 56,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             // 1. La Carta Flippable centradita con detector de deslizamiento
             GestureDetector(
@@ -218,24 +225,36 @@ class MessageBubble extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                gradient: isMe
+                    ? const LinearGradient(
+                        colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: isMe ? null : AppColors.surface,
+                border: isMe ? null : Border.all(color: AppColors.border, width: 1),
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF815BF5).withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                boxShadow: isMe
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF815BF5).withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Text(
                 word,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isMe ? Colors.white : AppColors.onSurface,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Inter',
@@ -246,7 +265,8 @@ class MessageBubble extends ConsumerWidget {
             // 3. Hora y check
             const SizedBox(height: 4),
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
               children: [
                 Text(
                   formatMessageTime(message.time),

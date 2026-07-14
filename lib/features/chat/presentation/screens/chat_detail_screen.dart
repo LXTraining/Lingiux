@@ -315,23 +315,20 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           Expanded(
             child: ref.watch(messagesProvider(widget.chat.id)).when(
               data: (messages) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-                  }
-                });
                 if (messages.isEmpty) {
                   return const Center(child: Text('No hay mensajes aún. ¡Comienza a chatear!'));
                 }
+                final reversedMessages = messages.reversed.toList();
                 return ListView.builder(
                   controller: _scrollController,
+                  reverse: true,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
                   ),
-                  itemCount: messages.length,
+                  itemCount: reversedMessages.length,
                   itemBuilder: (context, index) => MessageBubble(
-                    message: messages[index],
+                    message: reversedMessages[index],
                     conversationId: widget.chat.id,
                     onWordTap: _showWordCard,
                   ),
