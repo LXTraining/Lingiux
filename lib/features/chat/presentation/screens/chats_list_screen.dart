@@ -267,10 +267,11 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
                         },
                       );
                     },
-                    loading: () => const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
+                    loading: () => ListView.builder(
+                      itemCount: 6,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemBuilder: (context, index) => const _ChatListTileSkeleton(),
                     ),
                     error: (error, stack) => Center(
                       child: Text(
@@ -529,6 +530,188 @@ class _ChatListTile extends ConsumerWidget {
           : '${chat.name} ha compartido una tarjeta';
     }
     return chat.lastMessage;
+  }
+}
+
+class _ShimmerLoading extends StatefulWidget {
+  final Widget child;
+  const _ShimmerLoading({required this.child});
+
+  @override
+  State<_ShimmerLoading> createState() => _ShimmerLoadingState();
+}
+
+class _ShimmerLoadingState extends State<_ShimmerLoading>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              colors: const [
+                Color(0xFFE2E8F0),
+                Color(0xFFF1F5F9),
+                Color(0xFFE2E8F0),
+              ],
+              stops: const [0.0, 0.5, 1.0],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              transform: _SlidingGradientTransform(slidePercent: _controller.value),
+            ).createShader(bounds);
+          },
+          child: widget.child,
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+class _SlidingGradientTransform extends GradientTransform {
+  final double slidePercent;
+  const _SlidingGradientTransform({required this.slidePercent});
+
+  @override
+  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
+    final double width = bounds.width;
+    final double translation = -width + (width * 2 * slidePercent);
+    return Matrix4.translationValues(translation, 0.0, 0.0);
+  }
+}
+
+class _ChatListTileSkeleton extends StatelessWidget {
+  const _ChatListTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            children: [
+              // Avatar Circular
+              _ShimmerLoading(
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFCBD5E1),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Detalles del Chat (Nombre y Mensaje)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        // Nombre del Chat
+                        _ShimmerLoading(
+                          child: Container(
+                            width: 100,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFCBD5E1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        // Flags
+                        _ShimmerLoading(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFCBD5E1),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFCBD5E1),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        // Último mensaje
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 40),
+                            child: _ShimmerLoading(
+                              child: Container(
+                                height: 11,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFCBD5E1),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Hora
+                        _ShimmerLoading(
+                          child: Container(
+                            width: 32,
+                            height: 11,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFCBD5E1),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Divider(height: 1, thickness: 0.5, color: AppColors.border),
+        ),
+      ],
+    );
   }
 }
 
