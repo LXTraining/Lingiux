@@ -104,9 +104,23 @@ class ChatListTileSkeleton extends StatelessWidget {
 *   **Consultas a Caché Local (<100 ms)**: Si el dispositivo lee los datos desde una base de datos local rápida (`SharedPreferences` o `SQLite` local) en menos de 100 milisegundos, mostrar el Shimmer creará un "parpadeo" visual sumamente molesto. En estos casos, es preferible no mostrar ningún cargador o retrasar el Shimmer con un temporizador (*delayed future*) de 150 ms para que solo se muestre en conexiones muy lentas.
 *   **Botones y Formularios Cortos**: Para acciones instantáneas como "Iniciar Sesión" o "Enviar Mensaje", es preferible usar un spinner embebido pequeño dentro del propio botón para no deformar la estructura del formulario.
 
+## 🖼️ 5. Pre-Cacheado de Imágenes en la Transición (Solución al Flasheo de Avatares)
+
+### El problema:
+Incluso con una pantalla esqueleto perfectamente animada, cuando la base de datos responde con la lista de chats, la pantalla esqueleto desaparece de inmediato. En ese microsegundo, las celdas del chat se renderizan, pero las fotos de perfil (avatares) que se cargan desde internet (`NetworkImage`) apenas comienzan a descargarse en segundo plano. Esto causa un "flasheo" o pop visual molesto donde la celda se dibuja vacía por una fracción de segundo hasta que la imagen de internet aparece repentinamente.
+
+### La Solución Profesional:
+Mantener activa la pantalla esqueleto (**Skeleton Screen**) hasta que **tanto los datos estructurados como las imágenes de los avatares estén 100% descargadas en memoria caché**.
+
+En [chats_list_screen.dart](file:///c:/Users/sebas/OneDrive/Escritorio/Lingiux/lingiux_app/lib/features/chat/presentation/screens/chats_list_screen.dart), implementamos esta lógica de la siguiente manera:
+1.  **Registro de URLs Cacheadas**: Creamos un conjunto mutable `_cachedAvatarUrls` en el estado del widget para rastrear las imágenes ya disponibles en memoria.
+2.  **Pre-cacheado Asíncrono**: Cuando los datos de los chats están listos (`chatsAsync.value`), identificamos las imágenes de perfil que aún no han sido pre-cacheadas y disparamos la descarga en segundo plano usando la función nativa de Flutter `precacheImage(NetworkImage(url), context)`.
+3.  **Tolerancia a Red**: Envolvemos la descarga en un bloque `try-catch`. Si una imagen falla (por ejemplo, da error 404 o el usuario está sin conexión), la URL se registra de todas formas en `_cachedAvatarUrls` para evitar dejar la interfaz bloqueada indefinidamente en el esqueleto.
+4.  **Espera en la UI**: Evaluamos `hasUncachedImages`. Mientras existan imágenes pendientes por descargar, la interfaz continuará mostrando la pantalla esqueleto. Solo cuando todas las imágenes estén cargadas en memoria, se realiza la transición a los chats reales, logrando que aparezca todo al mismo tiempo en el primer frame.
+
 ---
 
-## 🔄 5. Alternativas Profesionales de Carga
+## 🔄 6. Alternativas Profesionales de Carga
 
 1.  **Skeletons Estáticos (Sin Animación)**: Siluetas grises fijas sin barrido de brillo. Su impacto en rendimiento es del 0% y proporciona sobriedad a la aplicación.
 2.  **BlurHash (Mosaicos Desenfocados)**: Excelente para imágenes de perfil y portadas. Permite guardar en base de datos un string corto que codifica los colores de la foto, renderizando una versión difuminada suave y hermosa mientras se descarga la imagen final de internet.
@@ -114,9 +128,9 @@ class ChatListTileSkeleton extends StatelessWidget {
 
 ---
 
-## 📂 6. Estado de la Implementación en Lingiux
+## 📂 7. Estado de la Implementación en Lingiux
 
 *   **Estado**: **Implementado con Éxito** en la pantalla principal de mensajes (`ChatsListScreen`).
 *   **Aproximación Técnica**: Implementamos el efecto Shimmer de forma **100% nativa y offline** mediante un `ShaderMask` animado con un `LinearGradient` deslizante en la GPU (`_ShimmerLoading`). Esto elimina la dependencia de librerías externas (evitando errores de conexión o incompatibilidades en el entorno de compilación) y mantiene el binario final de la aplicación sumamente ligero.
 *   **Archivos Modificados**:
-    *   [chats_list_screen.dart](file:///c:/Users/sebas/OneDrive/Escritorio/Lingiux/lingiux_app/lib/features/chat/presentation/screens/chats_list_screen.dart): Sustituido el `CircularProgressIndicator` central por una lista de 6 elementos esqueleto (`_ChatListTileSkeleton`) que replican la estructura real de los chats con la animación fluida de barrido.
+    *   [chats_list_screen.dart](file:///c:/Users/sebas/OneDrive/Escritorio/Lingiux/lingiux_app/lib/features/chat/presentation/screens/chats_list_screen.dart): Añadido el conjunto `_cachedAvatarUrls`, la lógica de pre-cacheado de imágenes en el método `build`, y la condición `hasUncachedImages` para mantener el esqueleto activo hasta completar las descargas de imágenes. También se agregaron los widgets de carga nativos `_ShimmerLoading` y `_ChatListTileSkeleton`.

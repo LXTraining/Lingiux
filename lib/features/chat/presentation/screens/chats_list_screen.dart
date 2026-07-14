@@ -19,6 +19,7 @@ class ChatsListScreen extends ConsumerStatefulWidget {
 
 class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
   int _activeSegment = 0; // 0 = Mensajes, 1 = Grupos
+  final Set<String> _cachedAvatarUrls = {};
 
   final List<Map<String, dynamic>> _mockPracticedCards = const [
     {
@@ -181,6 +182,36 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
   Widget build(BuildContext context) {
     final chatsAsync = ref.watch(chatsProvider);
 
+    // Lógica para pre-cachear imágenes de avatar antes de apagar el skeleton
+    final chatsList = chatsAsync.value;
+    bool hasUncachedImages = false;
+
+    if (chatsList != null) {
+      final uncachedUrls = chatsList
+          .where((c) => c.avatarUrl != null && c.avatarUrl!.isNotEmpty && !_cachedAvatarUrls.contains(c.avatarUrl))
+          .map((c) => c.avatarUrl!)
+          .toList();
+
+      hasUncachedImages = uncachedUrls.isNotEmpty;
+
+      if (hasUncachedImages) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          for (final url in uncachedUrls) {
+            try {
+              await precacheImage(NetworkImage(url), context);
+            } catch (_) {
+              // Evitar que la pantalla se quede atorada si falla el internet o da error 404
+            }
+            if (mounted) {
+              setState(() {
+                _cachedAvatarUrls.add(url);
+              });
+            }
+          }
+        });
+      }
+    }
+
     return Container(
       color: AppColors.background,
       child: Stack(
@@ -247,6 +278,15 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
                 Expanded(
                   child: chatsAsync.when(
                     data: (chats) {
+                      if (hasUncachedImages) {
+                        return ListView.builder(
+                          itemCount: 6,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemBuilder: (context, index) => const _ChatListTileSkeleton(),
+                        );
+                      }
+
                       if (chats.isEmpty) {
                         return const _EmptyChats();
                       }

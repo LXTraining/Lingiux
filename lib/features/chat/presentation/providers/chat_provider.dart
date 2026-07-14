@@ -108,57 +108,110 @@ class ChatService {
   }
 }
 
-// StreamProvider para escuchar las conversaciones del usuario en tiempo real
-final chatsProvider = StreamProvider.autoDispose<List<ChatEntity>>((ref) {
+// StreamProvider para escuchar las conversaciones del usuario en tiempo real con recuperación y fetch HTTP instantáneo
+final chatsProvider = StreamProvider.autoDispose<List<ChatEntity>>((ref) async* {
   final authState = ref.watch(authProvider);
   final user = authState.user;
-  if (user == null) return const Stream.empty();
+  if (user == null) {
+    yield [];
+    return;
+  }
 
   final supabase = ref.read(supabaseClientProvider);
 
+  // Función local para hacer el fetch HTTP rápido de conversaciones
+  Future<List<ChatEntity>> fetchChatsHttp() async {
+    final data = await supabase
+        .from('conversations')
+        .select('''
+          id,
+          last_message,
+          last_message_time,
+          active_nationality,
+          last_message_sender_id,
+          conversation_participants!inner(profile_id),
+          all_participants:conversation_participants(
+            profile:profiles(id, full_name, avatar_url, nationality)
+          )
+        ''')
+        .eq('conversation_participants.profile_id', user.id)
+        .order('last_message_time', ascending: false);
 
-  // Escuchar la tabla conversaciones. Cada cambio (incluyendo actualizaciones de last_message)
-  // gatillará el recargado de los datos relacionales de la conversación.
-  return supabase
+    return (data as List<dynamic>)
+        .map((json) => ChatModel.fromJson(json, user.id))
+        .toList();
+  }
+
+  // 1. Emitir inmediatamente el resultado del fetch HTTP rápido
+  List<ChatEntity> currentChats = [];
+  try {
+    currentChats = await fetchChatsHttp();
+    yield currentChats;
+  } catch (e) {
+    // Si falla el fetch inicial, al menos emitir lista vacía temporal o re-lanzar si es crítico
+    yield [];
+  }
+
+  // 2. Escuchar en tiempo real de forma segura y tolerante a fallos
+  final realtimeStream = supabase
       .from('conversations')
       .stream(primaryKey: ['id'])
-      .asyncMap((_) async {
-        final data = await supabase
-            .from('conversations')
-            .select('''
-              id,
-              last_message,
-              last_message_time,
-              active_nationality,
-              last_message_sender_id,
-              conversation_participants!inner(profile_id),
-              all_participants:conversation_participants(
-                profile:profiles(id, full_name, avatar_url, nationality)
-              )
-              )
-            ''')
-            .eq('conversation_participants.profile_id', user.id)
-            .order('last_message_time', ascending: false);
+      .asyncMap((_) => fetchChatsHttp());
 
-        return (data as List<dynamic>)
-            .map((json) => ChatModel.fromJson(json, user.id))
-            .toList();
-      });
+  await for (final updatedChats in realtimeStream.handleError((error) {
+    // Silenciar errores de WebSocket y mantener los datos actuales
+  })) {
+    currentChats = updatedChats;
+    yield currentChats;
+  }
 });
 
-// StreamProvider para escuchar los mensajes de una conversación en tiempo real
-final messagesProvider = StreamProvider.family.autoDispose<List<MessageEntity>, String>((ref, conversationId) {
+// StreamProvider para escuchar los mensajes de una conversación en tiempo real con recuperación y fetch HTTP instantáneo
+final messagesProvider = StreamProvider.family.autoDispose<List<MessageEntity>, String>((ref, conversationId) async* {
   final authState = ref.watch(authProvider);
   final user = authState.user;
-  if (user == null) return const Stream.empty();
+  if (user == null) {
+    yield [];
+    return;
+  }
 
   final supabase = ref.read(supabaseClientProvider);
 
-  return supabase
+  // Función local para hacer el fetch HTTP rápido de mensajes
+  Future<List<MessageEntity>> fetchMessagesHttp() async {
+    final data = await supabase
+        .from('messages')
+        .select()
+        .eq('conversation_id', conversationId)
+        .order('time', ascending: true);
+
+    return (data as List<dynamic>)
+        .map((json) => MessageModel.fromJson(json, user.id))
+        .toList();
+  }
+
+  // 1. Emitir inmediatamente el resultado del fetch HTTP rápido
+  List<MessageEntity> currentMessages = [];
+  try {
+    currentMessages = await fetchMessagesHttp();
+    yield currentMessages;
+  } catch (e) {
+    yield [];
+  }
+
+  // 2. Escuchar la tabla de mensajes en tiempo real
+  final realtimeStream = supabase
       .from('messages')
       .stream(primaryKey: ['id'])
       .eq('conversation_id', conversationId)
       .order('time', ascending: true)
       .map((list) => list.map((json) => MessageModel.fromJson(json, user.id)).toList());
+
+  await for (final updatedMessages in realtimeStream.handleError((error) {
+    // Silenciar errores de WebSocket y mantener los mensajes actuales
+  })) {
+    currentMessages = updatedMessages;
+    yield currentMessages;
+  }
 });
 
