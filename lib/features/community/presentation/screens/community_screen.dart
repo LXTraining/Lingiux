@@ -66,6 +66,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   bool _isInitialized = false;
   String _viewMode = 'Palabras'; // 'Palabras' o 'Personas'
   String _lastViewMode = 'Palabras';
+  late final TransformationController _transformationController;
 
   late Ticker _ticker;
   GraphNode? _draggedNode;
@@ -156,12 +157,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   @override
   void initState() {
     super.initState();
+    _transformationController = TransformationController();
     _ticker = createTicker(_onTick);
     _ticker.start();
   }
 
   @override
   void dispose() {
+    _transformationController.dispose();
     _ticker.dispose();
     _repaintNotifier.dispose();
     super.dispose();
@@ -687,7 +690,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
   @override
   Widget build(BuildContext context) {
-    final wordCardsAsync = ref.watch(wordCardsProvider);
+    final wordCardsAsync = ref.watch(correctWordCardsProvider);
     final chatsAsync = ref.watch(chatsProvider);
 
     return Container(
@@ -724,134 +727,167 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               elevation: 0,
               backgroundColor: Colors.transparent,
             ),
-            body: Column(
-              children: [
-                // Selector premium de modo: Palabras o Personas
-                _buildViewModeToggle(),
-
-                // Carrusel de filtros (solo visible para Palabras)
-                if (_viewMode == 'Palabras') _buildFiltersCarrusel(),
-
-                Expanded(
-                  child: _viewMode == 'Palabras'
-                      ? wordCardsAsync.when(
-                          loading: () => const Center(
-                            child: CircularProgressIndicator(color: AppColors.primary),
-                          ),
-                          error: (err, stack) => Center(
-                            child: Text(
-                              'Error al inicializar red neuronal: $err',
-                              style: const TextStyle(color: AppColors.error),
+            body: RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: AppColors.surface,
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                if (mounted) {
+                  setState(() {
+                    _isInitialized = false;
+                    _nodes.clear();
+                    _edges.clear();
+                    _transformationController.value = Matrix4.identity();
+                  });
+                }
+                ref.invalidate(wordCardsProvider);
+                ref.invalidate(resolvedCardsFamilyProvider(null));
+                ref.invalidate(resolvedCardsProvider);
+                ref.invalidate(correctWordCardsProvider);
+                ref.invalidate(chatsProvider);
+                try {
+                  await ref.read(correctWordCardsProvider.future);
+                  await ref.read(chatsProvider.future);
+                } catch (_) {}
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _SliverHeaderDelegate(
+                      height: _viewMode == 'Palabras' ? 112.0 : 56.0,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildViewModeToggle(),
+                          if (_viewMode == 'Palabras') _buildFiltersCarrusel(),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverFillRemaining(
+                    hasScrollBody: true,
+                    child: _viewMode == 'Palabras'
+                        ? wordCardsAsync.when(
+                            loading: () => const Center(
+                              child: CircularProgressIndicator(color: AppColors.primary),
                             ),
-                          ),
-                          data: (cards) {
-                            if (cards.isEmpty) {
-                              return const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 40.0),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.bubble_chart_outlined,
-                                        size: 68,
-                                        color: AppColors.onSurfaceMuted,
-                                      ),
-                                      SizedBox(height: 20),
-                                      Text(
-                                        'Tu Red Neuronal está vacía',
-                                        style: TextStyle(
-                                          color: AppColors.onSurface,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Inter',
-                                        ),
-                                      ),
-                                      SizedBox(height: 10),
-                                      Text(
-                                        'Las palabras y categorías que crees mediante tus Word Cards se conectarán aquí para simular tu constelación mental de aprendizaje.',
-                                        style: TextStyle(
-                                          color: AppColors.onSurfaceMuted,
-                                          fontSize: 14,
-                                          height: 1.5,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }
-
-                            if (!_isInitialized || _lastViewMode != _viewMode) {
-                              _syncWordNodes(cards);
-                              _isInitialized = true;
-                              _lastViewMode = _viewMode;
-                            }
-
-                            return _buildGraphView();
-                          },
-                        )
-                      : chatsAsync.when(
-                          loading: () => const Center(
-                            child: CircularProgressIndicator(color: AppColors.primary),
-                          ),
-                          error: (err, stack) => Center(
-                            child: Text(
-                              'Error al cargar red de comunidad: $err',
-                              style: const TextStyle(color: AppColors.error),
+                            error: (err, stack) => Center(
+                              child: Text(
+                                'Error al inicializar red neuronal: $err',
+                                style: const TextStyle(color: AppColors.error),
+                              ),
                             ),
-                          ),
-                          data: (chats) {
-                            if (chats.isEmpty) {
-                              return const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 40.0),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.forum_outlined,
-                                        size: 68,
-                                        color: AppColors.onSurfaceMuted,
-                                      ),
-                                      SizedBox(height: 20),
-                                      Text(
-                                        'Sin Conversaciones',
-                                        style: TextStyle(
-                                          color: AppColors.onSurface,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Inter',
-                                        ),
-                                      ),
-                                      SizedBox(height: 10),
-                                      Text(
-                                        'Inicia un chat con otros usuarios en el feed para ver su nacionalidad en tu Cerebro Mental.',
-                                        style: TextStyle(
+                            data: (cards) {
+                              if (cards.isEmpty) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 40.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.bubble_chart_outlined,
+                                          size: 68,
                                           color: AppColors.onSurfaceMuted,
-                                          fontSize: 14,
-                                          height: 1.5,
                                         ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
+                                        SizedBox(height: 20),
+                                        Text(
+                                          'Tu Red Neuronal está vacía',
+                                          style: TextStyle(
+                                            color: AppColors.onSurface,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        ),
+                                        SizedBox(height: 10),
+                                        Text(
+                                          'Las palabras y categorías que crees mediante tus Word Cards se conectarán aquí para simular tu constelación mental de aprendizaje.',
+                                          style: TextStyle(
+                                            color: AppColors.onSurfaceMuted,
+                                            fontSize: 14,
+                                            height: 1.5,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              );
-                            }
+                                );
+                              }
 
-                            if (!_isInitialized || _lastViewMode != _viewMode) {
-                              _syncPeopleNodes(chats);
-                              _isInitialized = true;
-                              _lastViewMode = _viewMode;
-                            }
+                              if (!_isInitialized || _lastViewMode != _viewMode) {
+                                _syncWordNodes(cards);
+                                _isInitialized = true;
+                                _lastViewMode = _viewMode;
+                              }
 
-                            return _buildGraphView();
-                          },
-                        ),
-                ),
-              ],
+                              return _buildGraphView();
+                            },
+                          )
+                        : chatsAsync.when(
+                            loading: () => const Center(
+                              child: CircularProgressIndicator(color: AppColors.primary),
+                            ),
+                            error: (err, stack) => Center(
+                              child: Text(
+                                'Error al cargar red de comunidad: $err',
+                                style: const TextStyle(color: AppColors.error),
+                              ),
+                            ),
+                            data: (chats) {
+                              if (chats.isEmpty) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 40.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.forum_outlined,
+                                          size: 68,
+                                          color: AppColors.onSurfaceMuted,
+                                        ),
+                                        SizedBox(height: 20),
+                                        Text(
+                                          'Sin Conversaciones',
+                                          style: TextStyle(
+                                            color: AppColors.onSurface,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        ),
+                                        SizedBox(height: 10),
+                                        Text(
+                                          'Inicia un chat con otros usuarios en el feed para ver su nacionalidad en tu Cerebro Mental.',
+                                          style: TextStyle(
+                                            color: AppColors.onSurfaceMuted,
+                                            fontSize: 14,
+                                            height: 1.5,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              if (!_isInitialized || _lastViewMode != _viewMode) {
+                                _syncPeopleNodes(chats);
+                                _isInitialized = true;
+                                _lastViewMode = _viewMode;
+                              }
+
+                              return _buildGraphView();
+                            },
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -894,6 +930,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           _isInitialized = false; // Forzar resincronización de nodos al cambiar de vista
           _nodes.clear();
           _edges.clear();
+          _transformationController.value = Matrix4.identity();
         });
       },
       child: AnimatedContainer(
@@ -1052,76 +1089,106 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   }
 
   Widget _buildGraphView() {
-    return Column(
-      children: [
-        // Canvas del Mapa Mental Interactivo
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return InteractiveViewer(
-                constrained: false,
-                panEnabled: _panEnabled,
-                scaleEnabled: true,
-                minScale: 0.3,
-                maxScale: 2.5,
-                boundaryMargin: const EdgeInsets.all(400),
-                child: Listener(
-                  onPointerDown: (event) {
-                    final localPos = event.localPosition;
-                    _touchStartPos = localPos;
-                    final tappedNode = _findNodeAt(localPos);
-                    if (tappedNode != null) {
-                      setState(() {
-                        _draggedNode = tappedNode;
-                        tappedNode.isDragged = true;
-                        _panEnabled = false; // Bloquear paneo global para poder arrastrar
-                      });
-                    }
-                  },
-                  onPointerMove: (event) {
-                    if (_draggedNode != null) {
-                      setState(() {
-                        _draggedNode!.position = event.localPosition;
-                        _draggedNode!.velocity = Offset.zero; // Detener inercias al arrastrar
-                      });
-                    }
-                  },
-                  onPointerUp: (event) {
-                    if (_draggedNode != null) {
-                      final node = _draggedNode!;
-                      setState(() {
-                        node.isDragged = false;
-                        _draggedNode = null;
-                        _panEnabled = true; // Liberar paneo
-                      });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double viewWidth = constraints.maxWidth;
+        final double viewHeight = constraints.maxHeight;
+        
+        final double targetX = (viewWidth / 2) - 400;
+        final double targetY = (viewHeight / 2) - 400;
+        
+        if (_transformationController.value.isIdentity()) {
+          _transformationController.value = Matrix4.identity()..translate(targetX, targetY);
+        }
 
-                      if (_touchStartPos != null) {
-                        final delta = (event.localPosition - _touchStartPos!).distance;
-                        if (delta < 6.0) {
-                          _handleNodeTap(node);
-                        }
-                      }
-                    }
-                    _touchStartPos = null;
-                  },
-                  child: CustomPaint(
-                    size: const Size(800, 800),
-                    painter: VocabularyGraphPainter(
-                      nodes: _nodes,
-                      edges: _edges,
-                      visibleNodes: _nodes.where(_isNodeVisible).toList(),
-                      profileImages: _profileImagesCache,
-                      flagImages: _flagPicturesCache,
-                      repaint: _repaintNotifier,
-                    ),
-                  ),
-                ),
-              );
+        return InteractiveViewer(
+          transformationController: _transformationController,
+          constrained: false,
+          panEnabled: _panEnabled,
+          scaleEnabled: true,
+          minScale: 0.3,
+          maxScale: 2.5,
+          boundaryMargin: const EdgeInsets.all(400),
+          child: Listener(
+            onPointerDown: (event) {
+              final localPos = event.localPosition;
+              _touchStartPos = localPos;
+              final tappedNode = _findNodeAt(localPos);
+              if (tappedNode != null) {
+                setState(() {
+                  _draggedNode = tappedNode;
+                  tappedNode.isDragged = true;
+                  _panEnabled = false; // Bloquear paneo global para poder arrastrar
+                });
+              }
             },
+            onPointerMove: (event) {
+              if (_draggedNode != null) {
+                setState(() {
+                  _draggedNode!.position = event.localPosition;
+                  _draggedNode!.velocity = Offset.zero; // Detener inercias al arrastrar
+                });
+              }
+            },
+            onPointerUp: (event) {
+              if (_draggedNode != null) {
+                final node = _draggedNode!;
+                setState(() {
+                  node.isDragged = false;
+                  _draggedNode = null;
+                  _panEnabled = true; // Liberar paneo
+                });
+
+                if (_touchStartPos != null) {
+                  final delta = (event.localPosition - _touchStartPos!).distance;
+                  if (delta < 6.0) {
+                    _handleNodeTap(node);
+                  }
+                }
+              }
+              _touchStartPos = null;
+            },
+            child: CustomPaint(
+              size: const Size(800, 800),
+              painter: VocabularyGraphPainter(
+                nodes: _nodes,
+                edges: _edges,
+                visibleNodes: _nodes.where(_isNodeVisible).toList(),
+                profileImages: _profileImagesCache,
+                flagImages: _flagPicturesCache,
+                repaint: _repaintNotifier,
+              ),
+            ),
           ),
-        ),
-      ],
+        );
+      },
     );
+  }
+}
+
+class _SliverHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _SliverHeaderDelegate({required this.child, required this.height});
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox(
+      height: height,
+      child: child,
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _SliverHeaderDelegate oldDelegate) {
+    return child != oldDelegate.child || height != oldDelegate.height;
   }
 }
 

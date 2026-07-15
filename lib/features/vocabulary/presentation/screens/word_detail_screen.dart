@@ -344,6 +344,8 @@ class _WordCardState extends ConsumerState<_WordCard> {
         'language': widget.wordCard.language ?? 'Inglés',
       }, onConflict: 'user_id,card_id');
       
+      ref.invalidate(resolvedCardsProvider);
+      
       if (widget.conversationId != null) {
         await incrementPuzzlePoints(supabase, widget.conversationId!);
       }

@@ -67,3 +67,10 @@ final resolvedCardsFamilyProvider = FutureProvider.family.autoDispose<List<Map<S
 final resolvedCardsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   return ref.watch(resolvedCardsFamilyProvider(null).future);
 });
+
+final correctWordCardsProvider = FutureProvider.autoDispose<List<WordCardModel>>((ref) async {
+  final cards = await ref.watch(wordCardsProvider.future);
+  final resolved = await ref.watch(resolvedCardsProvider.future);
+  final resolvedCardIds = resolved.map((r) => r['card_id'] as String).toSet();
+  return cards.where((card) => resolvedCardIds.contains(card.id)).toList();
+});
