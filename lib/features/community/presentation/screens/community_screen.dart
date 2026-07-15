@@ -72,6 +72,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   GraphNode? _draggedNode;
   Offset? _touchStartPos;
   bool _panEnabled = true;
+  int _activePointerCount = 0;
+  bool _isCanvasTouched = false;
+  Offset _dragOffset = Offset.zero;
 
   // Filtros activos para Cerebro Digital (Originales)
   String _selectedCategoryFilter = 'Todos';
@@ -737,6 +740,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     _isInitialized = false;
                     _nodes.clear();
                     _edges.clear();
+                    _activePointerCount = 0;
+                    _isCanvasTouched = false;
+                    _dragOffset = Offset.zero;
                     _transformationController.value = Matrix4.identity();
                   });
                 }
@@ -751,7 +757,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 } catch (_) {}
               },
               child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: _isCanvasTouched
+                    ? const NeverScrollableScrollPhysics()
+                    : const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverPersistentHeader(
                     pinned: true,
@@ -930,6 +938,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           _isInitialized = false; // Forzar resincronización de nodos al cambiar de vista
           _nodes.clear();
           _edges.clear();
+          _activePointerCount = 0;
+          _isCanvasTouched = false;
+          _dragOffset = Offset.zero;
           _transformationController.value = Matrix4.identity();
         });
       },
@@ -1094,11 +1105,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         final double viewWidth = constraints.maxWidth;
         final double viewHeight = constraints.maxHeight;
         
-        final double targetX = (viewWidth / 2) - 400;
-        final double targetY = (viewHeight / 2) - 400;
+        final double initialScale = 0.65; // Alejado al 65% para ver más constelación
+        final double targetX = (viewWidth / 2) - (400 * initialScale);
+        final double targetY = (viewHeight / 2) - (400 * initialScale);
         
         if (_transformationController.value.isIdentity()) {
-          _transformationController.value = Matrix4.identity()..translate(targetX, targetY);
+          _transformationController.value = Matrix4.identity()
+            ..translate(targetX, targetY)
+            ..scale(initialScale);
         }
 
         return InteractiveViewer(
@@ -1111,26 +1125,55 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           boundaryMargin: const EdgeInsets.all(400),
           child: Listener(
             onPointerDown: (event) {
+              setState(() {
+                _activePointerCount++;
+                _isCanvasTouched = true;
+              });
+              if (_activePointerCount > 1) {
+                // Si hay más de un dedo, cancelar arrastre de nodo y asegurar paneo/zoom en IV
+                if (_draggedNode != null) {
+                  setState(() {
+                    _draggedNode!.isDragged = false;
+                    _draggedNode = null;
+                  });
+                }
+                setState(() {
+                  _panEnabled = true;
+                });
+              }
+              
               final localPos = event.localPosition;
               _touchStartPos = localPos;
-              final tappedNode = _findNodeAt(localPos);
-              if (tappedNode != null) {
-                setState(() {
-                  _draggedNode = tappedNode;
-                  tappedNode.isDragged = true;
-                  _panEnabled = false; // Bloquear paneo global para poder arrastrar
-                });
+              
+              // Solo intentar arrastrar nodo si hay un único dedo en pantalla
+              if (_activePointerCount == 1) {
+                final tappedNode = _findNodeAt(localPos);
+                if (tappedNode != null) {
+                  setState(() {
+                    _draggedNode = tappedNode;
+                    tappedNode.isDragged = true;
+                    _dragOffset = tappedNode.position - localPos; // Guardar el delta de agarre
+                    _panEnabled = false; // Bloquear paneo para arrastrar el nodo
+                  });
+                }
               }
             },
             onPointerMove: (event) {
-              if (_draggedNode != null) {
+              if (_draggedNode != null && _activePointerCount == 1) {
                 setState(() {
-                  _draggedNode!.position = event.localPosition;
-                  _draggedNode!.velocity = Offset.zero; // Detener inercias al arrastrar
+                  _draggedNode!.position = event.localPosition + _dragOffset; // Mover con el delta
+                  _draggedNode!.velocity = Offset.zero;
                 });
               }
             },
             onPointerUp: (event) {
+              setState(() {
+                _activePointerCount = math.max(0, _activePointerCount - 1);
+                if (_activePointerCount == 0) {
+                  _isCanvasTouched = false;
+                }
+              });
+              
               if (_draggedNode != null) {
                 final node = _draggedNode!;
                 setState(() {
@@ -1139,7 +1182,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                   _panEnabled = true; // Liberar paneo
                 });
 
-                if (_touchStartPos != null) {
+                if (_touchStartPos != null && _activePointerCount == 0) {
                   final delta = (event.localPosition - _touchStartPos!).distance;
                   if (delta < 6.0) {
                     _handleNodeTap(node);
@@ -1147,6 +1190,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 }
               }
               _touchStartPos = null;
+            },
+            onPointerCancel: (event) {
+              setState(() {
+                _activePointerCount = math.max(0, _activePointerCount - 1);
+                if (_activePointerCount == 0) {
+                  _isCanvasTouched = false;
+                }
+              });
+              if (_draggedNode != null) {
+                setState(() {
+                  _draggedNode!.isDragged = false;
+                  _draggedNode = null;
+                  _panEnabled = true;
+                });
+              }
             },
             child: CustomPaint(
               size: const Size(800, 800),
