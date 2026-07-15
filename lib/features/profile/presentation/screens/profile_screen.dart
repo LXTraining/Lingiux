@@ -173,20 +173,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // --- CABECERA ALINEADA A LA IZQUIERDA CON BANDERAS ---
-                    const SizedBox(height: 14),
-                    
+                    // --- DISEÑO PREMIUM DE CABECERA: PIRÁMIDE INVERTIDA COMPACTA ---
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Column(
                         children: [
-                          // 1. Foto de perfil circular alineada a la izquierda (pulsable para cambiar)
+                          // 1. Avatar centrado en la parte superior
                           GestureDetector(
                             onTap: isOwnProfile ? () => _changeAvatar(context, ref) : null,
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
+                                // Anillo de brillo/destellos discreto
+                                Container(
+                                  width: 76,
+                                  height: 76,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: SweepGradient(
+                                      colors: [
+                                        AppColors.primary.withValues(alpha: 0.03),
+                                        Colors.amber.withValues(alpha: 0.12),
+                                        AppColors.primary.withValues(alpha: 0.03),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Avatar compacto (radio 30)
                                 Container(
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
@@ -194,13 +207,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withValues(alpha: 0.08),
-                                        blurRadius: 10,
+                                        blurRadius: 8,
                                         offset: const Offset(0, 4),
                                       ),
                                     ],
                                   ),
                                   child: CircleAvatar(
-                                    radius: 36, // Radio compacto
+                                    radius: 30,
                                     backgroundColor: AppColors.primary,
                                     backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
                                         ? NetworkImage(avatarUrl)
@@ -210,7 +223,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                             initials,
                                             style: const TextStyle(
                                               color: Colors.white,
-                                              fontSize: 22,
+                                              fontSize: 18,
                                               fontWeight: FontWeight.bold,
                                               fontFamily: 'Inter',
                                             ),
@@ -218,17 +231,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         : null,
                                   ),
                                 ),
-                                // Indicador online
+                                // Indicador online compacto
                                 Positioned(
                                   bottom: 2,
                                   right: 2,
                                   child: Container(
-                                    width: 14,
-                                    height: 14,
+                                    width: 12,
+                                    height: 12,
                                     decoration: BoxDecoration(
                                       color: AppColors.online,
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
+                                      border: Border.all(color: Colors.white, width: 1.8),
                                     ),
                                   ),
                                 ),
@@ -236,151 +249,164 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             ),
                           ),
                           
-                          const SizedBox(width: 16),
+                          const SizedBox(height: 6),
 
-                          // 2. Nickname, estrellas y banderas a la derecha de la foto
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  fullName,
-                                  style: const TextStyle(
-                                    color: AppColors.onSurface,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'Inter',
-                                  ),
+                          // Fila 2: Rango (Extremo Izq) | Nombre/Estrellas/Banderas (Centro) | Cartas (Extremo Der)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Stat 1: Extremo Izquierdo (Rango / Liga)
+                              Expanded(
+                                child: _buildHeaderStatCard(
+                                  title: 'LEYENDA',
+                                  subtitle: 'RANGO',
+                                  icon: Icons.emoji_events_rounded,
+                                  iconColor: Colors.amber,
                                 ),
-                                const SizedBox(height: 3),
-                                Row(
-                                  children: List.generate(5, (index) => const Icon(
-                                    Icons.star_rounded,
-                                    color: Colors.amber,
-                                    size: 14,
-                                  )),
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
+                              ),
+                              
+                              // Centro: Nombre, Estrellas y Banderas
+                              Container(
+                                width: 140,
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Bandera nativa de nacimiento (Español/México por defecto)
-                                    Container(
-                                      width: 22,
-                                      height: 22,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 1.5),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.08),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: ClipOval(
-                                        child: SvgPicture.asset(
-                                          profileAsync.value?['native_language'] == 'Inglés' ? 'assets/flags/us.svg' : 'assets/flags/mx.svg',
-                                          fit: BoxFit.cover,
-                                        ),
+                                    Text(
+                                      fullName,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.onSurface,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Inter',
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    // Icono de transición
-                                    const Icon(
-                                      Icons.arrow_forward_rounded,
-                                      size: 12,
-                                      color: AppColors.onSurfaceMuted,
+                                    const SizedBox(height: 1),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: List.generate(5, (index) => const Icon(
+                                        Icons.star_rounded,
+                                        color: Colors.amber,
+                                        size: 11,
+                                      )),
                                     ),
-                                    const SizedBox(width: 8),
-                                    // Bandera del idioma que aprende
-                                    Container(
-                                      width: 22,
-                                      height: 22,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 1.5),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.08),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        // Bandera Nativa
+                                        Container(
+                                          width: 18,
+                                          height: 18,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 1.2),
                                           ),
-                                        ],
-                                      ),
-                                      child: ClipOval(
-                                        child: SvgPicture.asset(
-                                          targetLanguage == 'Inglés' ? 'assets/flags/us.svg' : 'assets/flags/mx.svg',
-                                          fit: BoxFit.cover,
+                                          child: ClipOval(
+                                            child: SvgPicture.asset(
+                                              profileAsync.value?['native_language'] == 'Inglés' ? 'assets/flags/us.svg' : 'assets/flags/mx.svg',
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(horizontal: 4.0),
+                                          child: Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 9,
+                                            color: AppColors.onSurfaceMuted,
+                                          ),
+                                        ),
+                                        // Bandera Destino
+                                        Container(
+                                          width: 18,
+                                          height: 18,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 1.2),
+                                          ),
+                                          child: ClipOval(
+                                            child: SvgPicture.asset(
+                                              targetLanguage == 'Inglés' ? 'assets/flags/us.svg' : 'assets/flags/mx.svg',
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          // 3. Stats de cartas creadas a la derecha de la fila (estilo Plato)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceVariant.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppColors.border, width: 0.5),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  userCardsAsync.when(
+                              ),
+                              
+                              // Stat 2: Extremo Derecho (Cartas Creadas)
+                              Expanded(
+                                child: _buildHeaderStatCard(
+                                  title: userCardsAsync.when(
                                     data: (cards) => cards.length.toString(),
                                     loading: () => '...',
                                     error: (err, stack) => '0',
                                   ),
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    fontFamily: 'Inter',
+                                  subtitle: 'CARTAS',
+                                  icon: Icons.auto_awesome_motion_rounded,
+                                  iconColor: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 6),
+                          
+                          // Fila 3: Racha (Medio Izq) | Seguidores (Medio Der) - Escalón más centrado
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Row(
+                              children: [
+                                // Stat 3: Racha (Fuego)
+                                Expanded(
+                                  child: _buildHeaderStatCard(
+                                    title: (profileAsync.value?['streak_count'] ?? 0).toString(),
+                                    subtitle: 'RACHA',
+                                    icon: Icons.local_fire_department_rounded,
+                                    iconColor: Colors.orange,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                const Text(
-                                    'CARTAS',
-                                    style: TextStyle(
-                                      color: AppColors.onSurfaceMuted,
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
-                                    ),
+                                const SizedBox(width: 12),
+                                // Stat 4: Seguidores (Grupo)
+                                Expanded(
+                                  child: _buildHeaderStatCard(
+                                    title: '45',
+                                    subtitle: 'SEGUIDORES',
+                                    icon: Icons.group_rounded,
+                                    iconColor: Colors.blue,
                                   ),
+                                ),
                               ],
                             ),
+                          ),
+                          
+                          const SizedBox(height: 6),
+                          
+                          // Fila 4: Aciertos (Centro Abajo) - Último escalón centrado
+                          Container(
+                            width: 120,
+                            child: _buildHeaderStatCard(
+                              title: resolvedCardsAsync.when(
+                                  data: (resolved) => resolved.length.toString(),
+                                  loading: () => '...',
+                                  error: (err, stack) => '0',
+                                ),
+                                subtitle: 'ACIERTOS',
+                                icon: Icons.task_alt_rounded,
+                                iconColor: Colors.green,
+                              ),
                           ),
                         ],
                       ),
                     ),
-
-                    if (email.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(
-                          email,
-                          style: const TextStyle(
-                            color: AppColors.onSurfaceMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 14),
-
+                    const SizedBox(height: 8),
                     // Cuadro de estado/descripción (mensaje configurable por el usuario)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1146,6 +1172,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildHeaderStatCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.12), width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 3,
+            offset: const Offset(0, 1.5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: iconColor,
+            size: 12,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.onSurface,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: AppColors.onSurfaceMuted,
+              fontSize: 7,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
