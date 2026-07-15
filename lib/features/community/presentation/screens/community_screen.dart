@@ -746,11 +746,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     _transformationController.value = Matrix4.identity();
                   });
                 }
-                ref.invalidate(wordCardsProvider);
-                ref.invalidate(resolvedCardsFamilyProvider(null));
-                ref.invalidate(resolvedCardsProvider);
-                ref.invalidate(correctWordCardsProvider);
-                ref.invalidate(chatsProvider);
+                ref.refresh(wordCardsProvider);
+                ref.refresh(resolvedCardsFamilyProvider(null));
+                ref.refresh(resolvedCardsProvider);
+                ref.refresh(correctWordCardsProvider);
+                ref.refresh(chatsProvider);
                 try {
                   await ref.read(correctWordCardsProvider.future);
                   await ref.read(chatsProvider.future);
