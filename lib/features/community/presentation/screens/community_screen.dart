@@ -1389,9 +1389,18 @@ class VocabularyGraphPainter extends CustomPainter {
             ..addOval(Rect.fromCircle(center: node.position, radius: radius - 0.5));
           canvas.clipPath(clipPath);
 
-          final src = Rect.fromLTWH(0, 0, loadedImage.width.toDouble(), loadedImage.height.toDouble());
+          // Cortar un cuadrado perfecto del centro de la imagen origen para evitar distorsiones (BoxFit.cover)
+          final double srcWidth = loadedImage.width.toDouble();
+          final double srcHeight = loadedImage.height.toDouble();
+          final double minSide = math.min(srcWidth, srcHeight);
+          final double srcX = (srcWidth - minSide) / 2;
+          final double srcY = (srcHeight - minSide) / 2;
+
+          final src = Rect.fromLTWH(srcX, srcY, minSide, minSide);
           final dst = Rect.fromCircle(center: node.position, radius: radius - 0.5);
-          canvas.drawImageRect(loadedImage, src, dst, Paint());
+          
+          final paint = Paint()..filterQuality = ui.FilterQuality.high;
+          canvas.drawImageRect(loadedImage, src, dst, paint);
           canvas.restore();
         } else {
           // Fallback: iniciales
