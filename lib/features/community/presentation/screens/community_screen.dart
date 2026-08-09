@@ -60,7 +60,7 @@ class CommunityScreen extends ConsumerStatefulWidget {
 }
 
 class _CommunityScreenState extends ConsumerState<CommunityScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final List<GraphNode> _nodes = [];
   final List<GraphEdge> _edges = [];
   bool _isInitialized = false;
@@ -70,6 +70,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
   late Ticker _ticker;
   GraphNode? _draggedNode;
+  GraphNode? _selectedWordNode; // Guardar la palabra seleccionada para previsualización
+  String? _previousSelectedWordNodeId; // Para la transición suave del aura
+  late final AnimationController _selectionAnimationController;
   Offset? _touchStartPos;
   bool _panEnabled = true;
   int _activePointerCount = 0;
@@ -163,6 +166,12 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     _transformationController = TransformationController();
     _ticker = createTicker(_onTick);
     _ticker.start();
+    _selectionAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220), // Transición ligera, suave y rápida
+    )..addListener(() {
+        _repaintNotifier.requestRepaint(); // Asegurar repintado en cada frame de la transición
+      });
   }
 
   @override
@@ -170,6 +179,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     _transformationController.dispose();
     _ticker.dispose();
     _repaintNotifier.dispose();
+    _selectionAnimationController.dispose();
     super.dispose();
   }
 
@@ -675,12 +685,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         }
       });
     } else if (node.type == 'word' && node.wordCard != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => WordDetailScreen(selectedWord: node.wordCard!.word),
-        ),
-      );
+      _selectWordNode(node);
     } else if (node.type == 'person' && node.id.isNotEmpty) {
       Navigator.push(
         context,
@@ -743,6 +748,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     _activePointerCount = 0;
                     _isCanvasTouched = false;
                     _dragOffset = Offset.zero;
+                    _selectedWordNode = null;
+                    _previousSelectedWordNodeId = null;
+                    _selectionAnimationController.value = 0.0;
                     _transformationController.value = Matrix4.identity();
                   });
                 }
@@ -898,6 +906,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               ),
             ),
           ),
+          if (_selectedWordNode != null)
+            _buildWordPreviewOverlay(_selectedWordNode!),
         ],
       ),
     );
@@ -940,6 +950,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           _edges.clear();
           _activePointerCount = 0;
           _isCanvasTouched = false;
+          _selectedWordNode = null;
+          _previousSelectedWordNodeId = null;
+          _selectionAnimationController.value = 0.0;
           _dragOffset = Offset.zero;
           _transformationController.value = Matrix4.identity();
         });
@@ -1188,6 +1201,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     _handleNodeTap(node);
                   }
                 }
+              } else {
+                // Tap en canvas vacío: deselecciona la previsualización activa
+                if (_touchStartPos != null && _activePointerCount == 0) {
+                  final delta = (event.localPosition - _touchStartPos!).distance;
+                  if (delta < 6.0) {
+                    _selectWordNode(null);
+                  }
+                }
               }
               _touchStartPos = null;
             },
@@ -1214,12 +1235,308 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 visibleNodes: _nodes.where(_isNodeVisible).toList(),
                 profileImages: _profileImagesCache,
                 flagImages: _flagPicturesCache,
+                selectedWordNodeId: _selectedWordNode?.id,
+                previousSelectedWordNodeId: _previousSelectedWordNodeId,
+                selectionAnimationValue: _selectionAnimationController.value,
                 repaint: _repaintNotifier,
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  List<GraphNode> _getSiblingWordNodes(GraphNode wordNode) {
+    if (wordNode.type != 'word' || wordNode.wordCard == null) return [];
+    final catName = (wordNode.wordCard!.category ?? 'VOCABULARIO').toUpperCase();
+    return _nodes
+        .where((n) => n.type == 'word' &&
+            n.wordCard != null &&
+            (n.wordCard!.category ?? 'VOCABULARIO').toUpperCase() == catName &&
+            _isNodeVisible(n))
+        .toList();
+  }
+
+  void _navigateToSiblingWord(bool next) {
+    if (_selectedWordNode == null) return;
+    final siblings = _getSiblingWordNodes(_selectedWordNode!);
+    if (siblings.length <= 1) return;
+
+    int currentIndex = siblings.indexWhere((n) => n.id == _selectedWordNode!.id);
+    if (currentIndex == -1) return;
+
+    int nextIndex;
+    if (next) {
+      nextIndex = (currentIndex + 1) % siblings.length;
+    } else {
+      nextIndex = (currentIndex - 1 + siblings.length) % siblings.length;
+    }
+
+    HapticFeedback.lightImpact();
+    _selectWordNode(siblings[nextIndex]);
+  }
+
+  void _selectWordNode(GraphNode? node) {
+    if (node?.id == _selectedWordNode?.id) return;
+
+    setState(() {
+      _previousSelectedWordNodeId = _selectedWordNode?.id;
+      _selectedWordNode = node;
+    });
+
+    if (node != null) {
+      _selectionAnimationController.forward(from: 0.0);
+    } else {
+      _previousSelectedWordNodeId = null;
+      _selectionAnimationController.value = 0.0;
+    }
+  }
+
+  Widget _buildWordPreviewOverlay(GraphNode node) {
+    final card = node.wordCard;
+    if (card == null) return const SizedBox.shrink();
+
+    return Positioned(
+      bottom: 24,
+      left: 20,
+      right: 20,
+      child: GestureDetector(
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity == null) return;
+          if (details.primaryVelocity! < 0) {
+            // Deslizar a la izquierda -> Siguiente palabra
+            _navigateToSiblingWord(true);
+          } else if (details.primaryVelocity! > 0) {
+            // Deslizar a la derecha -> Palabra anterior
+            _navigateToSiblingWord(false);
+          }
+        },
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => WordDetailScreen(selectedWord: card.word),
+            ),
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Stack(
+              children: [
+                Container(
+                  height: 128, // Altura fija estricta para evitar saltos o reajustes visuales
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.30), // Translucidez de cristal esmerilado premium (frosted glass)
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      // Animación de empuje horizontal para simular el carrusel interno
+                      return SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.08, 0.0),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                        child: FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildPreviewCardContent(node),
+                  ),
+                ),
+                // Botón de cerrar posicionado absolutamente en la esquina superior derecha
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _selectedWordNode = null;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.10),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: AppColors.onSurfaceMuted,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewCardContent(GraphNode node) {
+    final card = node.wordCard;
+    if (card == null) return const SizedBox.shrink();
+
+    final hasCategory = card.category != null && card.category!.isNotEmpty;
+
+    return Row(
+      key: ValueKey<String>(node.id), // Clave para disparar la animación al cambiar de palabra
+      crossAxisAlignment: CrossAxisAlignment.center, // Centrar verticalmente los elementos de la fila
+      children: [
+        // Imagen de la carta (redondeada, con sombras y fit cover)
+        if (card.imageUrl.isNotEmpty)
+          Container(
+            width: 86, // Ligeramente más compacto para evitar cualquier desbordamiento vertical
+            height: 86,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppColors.border.withOpacity(0.4),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(17),
+              child: Image.network(
+                card.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: const Color(0xFFF1F5F9),
+                    child: const Icon(
+                      Icons.image_not_supported_rounded,
+                      color: AppColors.onSurfaceMuted,
+                      size: 24,
+                    ),
+                  );
+                },
+              ),
+            ),
+          )
+        else
+          Container(
+            width: 86,
+            height: 86,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppColors.border.withOpacity(0.4),
+                width: 1,
+              ),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.image_aspect_ratio_rounded,
+                color: AppColors.onSurfaceMuted,
+                size: 24,
+              ),
+            ),
+          ),
+        const SizedBox(width: 16),
+        
+        // Textos e información
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center, // Centrar verticalmente los textos de la columna
+            children: [
+              // Badge de Categoría (solo si existe)
+              if (hasCategory) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: node.color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    card.category!.toUpperCase(),
+                    style: TextStyle(
+                      color: node.color,
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              
+              // Palabra con letra capital en mayúscula
+              Text(
+                card.word.isNotEmpty
+                    ? (card.word[0].toUpperCase() + card.word.substring(1))
+                    : '',
+                style: const TextStyle(
+                  color: AppColors.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              
+              // Pronunciación Fonética
+              if (card.phonetic.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  card.phonetic,
+                  style: const TextStyle(
+                    color: AppColors.onSurfaceMuted,
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 6),
+              
+              // Definición
+              Text(
+                card.definition,
+                style: const TextStyle(
+                  color: AppColors.onSurface,
+                  fontSize: 11.5,
+                  height: 1.25,
+                  fontFamily: 'Inter',
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1256,6 +1573,9 @@ class VocabularyGraphPainter extends CustomPainter {
   final List<GraphNode> visibleNodes;
   final Map<String, ui.Image> profileImages;
   final Map<String, PictureInfo> flagImages;
+  final String? selectedWordNodeId; // ID del nodo de palabra seleccionado para el aura
+  final String? previousSelectedWordNodeId; // ID del nodo seleccionado anteriormente (para transición)
+  final double selectionAnimationValue; // Valor de la transición suave del aura (0.0 a 1.0)
 
   VocabularyGraphPainter({
     required this.nodes,
@@ -1263,6 +1583,9 @@ class VocabularyGraphPainter extends CustomPainter {
     required this.visibleNodes,
     required this.profileImages,
     required this.flagImages,
+    this.selectedWordNodeId,
+    this.previousSelectedWordNodeId,
+    this.selectionAnimationValue = 1.0,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
@@ -1295,6 +1618,22 @@ class VocabularyGraphPainter extends CustomPainter {
       final isCategory = node.type == 'category' || node.type == 'nationality';
       final radius = isCategory ? 24.0 : 12.0;
 
+      // Si es el nodo de palabra seleccionado actualmente, dibujar una hermosa aura brillante de neón de doble capa
+      final isSelectedWord = node.type == 'word' && node.id == selectedWordNodeId;
+      if (isSelectedWord) {
+        // Capa externa del brillo (Bloom amplio)
+        final outerGlowPaint = Paint()
+          ..color = node.color.withValues(alpha: 0.35)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+        canvas.drawCircle(node.position, radius + 12, outerGlowPaint);
+
+        // Capa interna del brillo (Núcleo intenso)
+        final innerGlowPaint = Paint()
+          ..color = node.color.withValues(alpha: 0.75)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+        canvas.drawCircle(node.position, radius + 6, innerGlowPaint);
+      }
+
       // Efecto brillo de Neón / Aura para nodos Categoría
       if (isCategory) {
         final glowPaint = Paint()
@@ -1315,6 +1654,15 @@ class VocabularyGraphPainter extends CustomPainter {
         ..strokeWidth = isCategory ? 2.5 : 1.2
         ..style = PaintingStyle.stroke;
       canvas.drawCircle(node.position, radius, borderPaint);
+
+      // Si es la palabra seleccionada, dibujar un borde de selección blanco extra exterior
+      if (isSelectedWord) {
+        final selectBorderPaint = Paint()
+          ..color = Colors.white
+          ..strokeWidth = 2.2
+          ..style = PaintingStyle.stroke;
+        canvas.drawCircle(node.position, radius + 3, selectBorderPaint);
+      }
 
       // Dibujar contenido interior
       if (node.type == 'category') {
