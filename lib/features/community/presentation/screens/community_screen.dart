@@ -1642,18 +1642,48 @@ class VocabularyGraphPainter extends CustomPainter {
         canvas.drawCircle(node.position, radius + 6, glowPaint);
       }
 
-      // Relleno sólido
-      final fillPaint = Paint()
-        ..color = isCategory ? node.color : node.color.withValues(alpha: 0.85)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(node.position, radius, fillPaint);
+      // Dibujar cuerpo del nodo (Efecto Burbuja/Gema 2D Cartoon Juguetón)
+      if (node.type == 'word') {
+        // 1. Cuerpo de color sólido y vibrante (Estilo 2D)
+        final bodyPaint = Paint()
+          ..color = node.color
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(node.position, radius, bodyPaint);
 
-      // Borde del nodo
-      final borderPaint = Paint()
-        ..color = Colors.white.withValues(alpha: isCategory ? 0.90 : 0.50)
-        ..strokeWidth = isCategory ? 2.5 : 1.2
-        ..style = PaintingStyle.stroke;
-      canvas.drawCircle(node.position, radius, borderPaint);
+        // 2. Contorno blanco sutil
+        final rimPaint = Paint()
+          ..color = Colors.white.withValues(alpha: 0.35)
+          ..strokeWidth = 1.0
+          ..style = PaintingStyle.stroke;
+        canvas.drawCircle(node.position, radius, rimPaint);
+
+        // 3. Destello especular principal muy blanco y marcado en la parte superior izquierda
+        final glossPaint = Paint()
+          ..color = Colors.white.withValues(alpha: 0.85) // Resplandor blanco sólido para estilo caricatura
+          ..style = PaintingStyle.fill;
+        final glossCenter = node.position - Offset(radius * 0.30, radius * 0.30);
+        canvas.drawCircle(glossCenter, radius * 0.26, glossPaint);
+
+        // 4. Micro reflejo secundario en la parte inferior derecha para dar sensación de volumen 2D
+        final minorGlossPaint = Paint()
+          ..color = Colors.white.withValues(alpha: 0.40)
+          ..style = PaintingStyle.fill;
+        final minorGlossCenter = node.position + Offset(radius * 0.36, radius * 0.36);
+        canvas.drawCircle(minorGlossCenter, radius * 0.12, minorGlossPaint);
+      } else {
+        // Relleno sólido para categorías y nacionalidades
+        final fillPaint = Paint()
+          ..color = isCategory ? node.color : node.color.withValues(alpha: 0.85)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(node.position, radius, fillPaint);
+
+        // Borde del nodo
+        final borderPaint = Paint()
+          ..color = Colors.white.withValues(alpha: isCategory ? 0.90 : 0.50)
+          ..strokeWidth = isCategory ? 2.5 : 1.2
+          ..style = PaintingStyle.stroke;
+        canvas.drawCircle(node.position, radius, borderPaint);
+      }
 
       // Si es la palabra seleccionada, dibujar un borde de selección blanco extra exterior
       if (isSelectedWord) {
