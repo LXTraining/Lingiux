@@ -389,19 +389,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           
                           const SizedBox(height: 6),
                           
-                          // Fila 4: Aciertos (Centro Abajo) - Último escalón centrado
+                          // Fila 4: Nacionalidad (Centro Abajo) - Último escalón centrado
                           Container(
                             width: 120,
-                            child: _buildHeaderStatCard(
-                              title: resolvedCardsAsync.when(
-                                  data: (resolved) => resolved.length.toString(),
-                                  loading: () => '...',
-                                  error: (err, stack) => '0',
-                                ),
-                                subtitle: 'ACIERTOS',
-                                icon: Icons.task_alt_rounded,
-                                iconColor: Colors.green,
-                              ),
+                            child: _buildNationalityStatCard(
+                              profileAsync.value?['nationality'] as String? ?? 'México',
+                            ),
                           ),
                         ],
                       ),
@@ -1175,56 +1168,121 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  String _getNationalityFlagAsset(String nationality) {
+    switch (nationality.toUpperCase()) {
+      case 'MÉXICO':
+      case 'MEXICO':
+        return 'assets/flags/mx.svg';
+      case 'ESTADOS UNIDOS':
+      case 'USA':
+      case 'UNITED STATES':
+        return 'assets/flags/us.svg';
+      case 'ALEMANIA':
+      case 'GERMANY':
+        return 'assets/flags/de.svg';
+      case 'FRANCIA':
+      case 'FRANCE':
+        return 'assets/flags/fr.svg';
+      case 'ITALIA':
+      case 'ITALY':
+        return 'assets/flags/it.svg';
+      case 'BRASIL':
+      case 'BRAZIL':
+        return 'assets/flags/br.svg';
+      default:
+        return '';
+    }
+  }
+
+  Widget _buildNationalityStatCard(String nationality) {
+    final flagAsset = _getNationalityFlagAsset(nationality);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 1.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: flagAsset.isNotEmpty
+                ? SvgPicture.asset(
+                    flagAsset,
+                    fit: BoxFit.cover,
+                  )
+                : const Icon(Icons.flag_rounded, size: 10, color: AppColors.onSurfaceMuted),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          nationality.toUpperCase(),
+          style: const TextStyle(
+            color: AppColors.onSurface,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            fontFamily: 'Inter',
+          ),
+        ),
+        const SizedBox(height: 1),
+        const Text(
+          'NACIONALIDAD',
+          style: TextStyle(
+            color: AppColors.onSurfaceMuted,
+            fontSize: 7,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildHeaderStatCard({
     required String title,
     required String subtitle,
     required IconData icon,
     required Color iconColor,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.12), width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 3,
-            offset: const Offset(0, 1.5),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          icon,
+          color: iconColor,
+          size: 12,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppColors.onSurface,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            fontFamily: 'Inter',
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: iconColor,
-            size: 12,
+        ),
+        const SizedBox(height: 1),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppColors.onSurfaceMuted,
+            fontSize: 7,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
           ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.onSurface,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: AppColors.onSurfaceMuted,
-              fontSize: 7,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
