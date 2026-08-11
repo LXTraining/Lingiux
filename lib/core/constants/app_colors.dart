@@ -36,7 +36,7 @@ class AppColors {
   static const Color darkOnSurface = Color(0xFFE8E6F0);
   static const Color darkOnSurfaceMuted = Color(0xFF9892B0);
 
-  // Colores para el degradado premium superior
-  static const Color gradientBgStart = Color(0xFF6E8EDC); // Azul de referencia
-  static const Color gradientBgEnd = Color(0xFFB183E9);   // Violeta de referencia
+  // Colores para el degradado premium superior (Verde-Teal a Azul-Celeste)
+  static const Color gradientBgStart = Color(0xFF3EDAB4); // Verde-Teal premium
+  static const Color gradientBgEnd = Color(0xFF5BA2F4);   // Azul-Celeste premium
 }

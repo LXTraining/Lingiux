@@ -37,7 +37,7 @@ class FeedScreen extends ConsumerWidget {
                   colors: [
                     AppColors.gradientBgStart.withValues(alpha: 0.45),
                     AppColors.gradientBgEnd.withValues(alpha: 0.45),
-                    Colors.transparent,
+                    AppColors.gradientBgEnd.withValues(alpha: 0.0),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,

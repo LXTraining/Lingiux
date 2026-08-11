@@ -29,7 +29,7 @@ class SettingsScreen extends ConsumerWidget {
                   colors: [
                     AppColors.gradientBgStart.withValues(alpha: 0.25),
                     AppColors.gradientBgEnd.withValues(alpha: 0.25),
-                    Colors.transparent,
+                    AppColors.gradientBgEnd.withValues(alpha: 0.0),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
