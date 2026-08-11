@@ -63,6 +63,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final lower = lang.toLowerCase();
     if (lower == 'inglés' || lower == 'english' || lower == 'en') {
       return 'assets/flags/us.svg';
+    } else if (lower == 'francés' || lower == 'frances' || lower == 'fr' || lower == 'french') {
+      return 'assets/flags/fr.svg';
+    } else if (lower == 'alemán' || lower == 'aleman' || lower == 'de' || lower == 'german') {
+      return 'assets/flags/de.svg';
+    } else if (lower == 'italiano' || lower == 'it' || lower == 'italian') {
+      return 'assets/flags/it.svg';
+    } else if (lower == 'portugués' || lower == 'portugues' || lower == 'pt' || lower == 'portuguese') {
+      return 'assets/flags/br.svg';
     }
     return 'assets/flags/mx.svg';
   }
@@ -307,7 +315,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                           ),
                                           child: ClipOval(
                                             child: SvgPicture.asset(
-                                              profileAsync.value?['native_language'] == 'Inglés' ? 'assets/flags/us.svg' : 'assets/flags/mx.svg',
+                                              _getFlagPath(profileAsync.value?['native_language'] ?? ''),
                                               fit: BoxFit.cover,
                                             ),
                                           ),
@@ -330,7 +338,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                           ),
                                           child: ClipOval(
                                             child: SvgPicture.asset(
-                                              targetLanguage == 'Inglés' ? 'assets/flags/us.svg' : 'assets/flags/mx.svg',
+                                              _getFlagPath(targetLanguage),
                                               fit: BoxFit.cover,
                                             ),
                                           ),
@@ -461,94 +469,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 12),
-
-                    // 4. Botones de acción horizontal compactos (altura 38)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Row(
-                        children: [
-                          if (isOwnProfile) ...[
-                            // Ajustes (Engranaje)
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                                  );
-                                },
-                                child: Container(
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceVariant,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: AppColors.border, width: 0.5),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.settings_outlined,
-                                        color: AppColors.onSurface,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Text(
-                                        'AJUSTES',
-                                        style: TextStyle(
-                                          color: AppColors.onSurface,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                          fontFamily: 'Inter',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Compartir
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                },
-                                child: Container(
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceVariant,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: AppColors.border, width: 0.5),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.share_rounded,
-                                        color: AppColors.onSurface,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Text(
-                                        'COMPARTIR',
-                                        style: TextStyle(
-                                          color: AppColors.onSurface,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                          fontFamily: 'Inter',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ] else ...[
+                    // 4. Botones de acción horizontal compactos (Solo para perfiles ajenos)
+                    if (!isOwnProfile) ...[
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Row(
+                          children: [
                             // Mensaje directo (Perfil ajeno)
                             Expanded(
                               child: ElevatedButton.icon(
@@ -629,88 +556,179 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
 
-                  // Pestañas de Selección de Vista (Grid de publicaciones e intereses estilo Plato)
+                  // Pestañas de Selección de Vista (Cápsula deslizable premium)
                   const SizedBox(height: 20),
-                  Container(
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: AppColors.border, width: 0.5),
-                        bottom: BorderSide(color: AppColors.border, width: 0.5),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: GestureDetector(
+                      onHorizontalDragEnd: (details) {
+                        if (details.primaryVelocity != null) {
+                          if (details.primaryVelocity! < -200 && _activeTabIndex == 0) {
+                            // Deslizar hacia la izquierda: ir a pestaña 1 (Mi Progreso)
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _activeTabIndex = 1;
+                            });
+                            if (_pageController.hasClients) {
+                              _pageController.animateToPage(
+                                1,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          } else if (details.primaryVelocity! > 200 && _activeTabIndex == 1) {
+                            // Deslizar hacia la derecha: ir a pestaña 0 (Mis Cartas)
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _activeTabIndex = 0;
+                            });
+                            if (_pageController.hasClients) {
+                              _pageController.animateToPage(
+                                0,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          }
+                        }
+                      },
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: AppColors.border.withValues(alpha: 0.5),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final totalWidth = constraints.maxWidth;
+                            final pillWidth = totalWidth / 2 - 2;
+                            final leftOffset = _activeTabIndex == 0 ? 2.0 : (totalWidth / 2);
+                            
+                            return Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                // Fondo de la pestaña activa (Cápsula deslizable)
+                                AnimatedPositioned(
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeInOut,
+                                  left: leftOffset,
+                                  top: 2,
+                                  bottom: 2,
+                                  width: pillWidth,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.primary.withValues(alpha: 0.35),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Botones de las pestañas
+                                Row(
+                                  children: [
+                                    // Tab 0: Mis Cartas
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          setState(() {
+                                            _activeTabIndex = 0;
+                                          });
+                                          if (_pageController.hasClients) {
+                                            _pageController.animateToPage(
+                                              0,
+                                              duration: const Duration(milliseconds: 250),
+                                              curve: Curves.easeInOut,
+                                            );
+                                          }
+                                        },
+                                        child: Container(
+                                          color: Colors.transparent,
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.collections_bookmark_rounded,
+                                                color: _activeTabIndex == 0 ? Colors.white : AppColors.onSurfaceMuted,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Mis Cartas',
+                                                style: TextStyle(
+                                                  color: _activeTabIndex == 0 ? Colors.white : AppColors.onSurfaceMuted,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'Inter',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Tab 1: Mi Progreso
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          setState(() {
+                                            _activeTabIndex = 1;
+                                          });
+                                          if (_pageController.hasClients) {
+                                            _pageController.animateToPage(
+                                              1,
+                                              duration: const Duration(milliseconds: 250),
+                                              curve: Curves.easeInOut,
+                                            );
+                                          }
+                                        },
+                                        child: Container(
+                                          color: Colors.transparent,
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.leaderboard_rounded,
+                                                color: _activeTabIndex == 1 ? Colors.white : AppColors.onSurfaceMuted,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Mi Progreso',
+                                                style: TextStyle(
+                                                  color: _activeTabIndex == 1 ? Colors.white : AppColors.onSurfaceMuted,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'Inter',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _activeTabIndex = 0;
-                              });
-                              if (_pageController.hasClients) {
-                                _pageController.animateToPage(
-                                  0,
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: _activeTabIndex == 0 ? AppColors.primary : Colors.transparent,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.grid_on_rounded,
-                                color: _activeTabIndex == 0 ? AppColors.primary : AppColors.onSurfaceMuted,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _activeTabIndex = 1;
-                              });
-                              if (_pageController.hasClients) {
-                                _pageController.animateToPage(
-                                  1,
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: _activeTabIndex == 1 ? AppColors.primary : Colors.transparent,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.style_outlined,
-                                color: _activeTabIndex == 1 ? AppColors.primary : AppColors.onSurfaceMuted,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
 
@@ -736,17 +754,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           final Set<String> languages = {};
                           for (final c in userCards) {
                             if (c.language != null && c.language!.isNotEmpty) {
-                              languages.add(c.language!);
+                              languages.add(c.language!.toUpperCase());
                             }
                           }
                           for (final rc in resolvedCards) {
                             final String? lang = rc['language'] as String?;
                             if (lang != null && lang.isNotEmpty) {
-                              languages.add(lang);
+                              languages.add(lang.toUpperCase());
                             }
                           }
                           if (languages.isEmpty) {
-                            languages.add('Inglés');
+                            languages.add('INGLÉS');
                           }
                           final languageList = languages.toList()..sort();
                           final statsHeight = (languageList.length * 80.0) + 60.0;
