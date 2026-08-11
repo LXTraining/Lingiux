@@ -243,10 +243,6 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.search_rounded),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined),
                   onPressed: () => _showSearchUsersModal(context),
                 ),
                 const SizedBox(width: 4),
@@ -827,21 +823,22 @@ class _SearchUsersSheetState extends ConsumerState<_SearchUsersSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final sheetHeight = screenHeight * 0.85;
 
     return Container(
-      margin: const EdgeInsets.only(top: 80),
+      height: sheetHeight,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      padding: EdgeInsets.only(
+      padding: const EdgeInsets.only(
         left: 20,
         right: 20,
         top: 12,
-        bottom: bottomInset + 20,
+        bottom: 20,
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Drag bar
@@ -890,98 +887,96 @@ class _SearchUsersSheetState extends ConsumerState<_SearchUsersSheet> {
           const SizedBox(height: 20),
 
           // Search Results
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 300),
-            child: _isLoading
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: _isLoading
+                  ? const Center(
                       child: CircularProgressIndicator(color: AppColors.primary),
-                    ),
-                  )
-                : _searchResults.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Text(
-                            _searchController.text.isEmpty
-                                ? 'Busca por nombre para iniciar una conversación'
-                                : 'No se encontraron usuarios',
-                            style: const TextStyle(color: AppColors.onSurfaceMuted, fontSize: 14),
-                            textAlign: TextAlign.center,
+                    )
+                  : _searchResults.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Text(
+                              _searchController.text.isEmpty
+                                  ? 'Busca por nombre para iniciar una conversación'
+                                  : 'No se encontraron usuarios',
+                              style: const TextStyle(color: AppColors.onSurfaceMuted, fontSize: 14),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _searchResults.length,
-                        itemBuilder: (context, index) {
-                          final profile = _searchResults[index];
-                          final name = profile['full_name'] as String? ?? 'Usuario';
-                          final otherUserId = profile['id'] as String;
-                          final avatarUrl = profile['avatar_url'] as String?;
-                          final initials = name.trim().isNotEmpty
-                              ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
-                              : 'LX';
-                          final color = AppColors.avatarColors[otherUserId.hashCode.abs() % AppColors.avatarColors.length];
+                        )
+                      : ListView.builder(
+                          itemCount: _searchResults.length,
+                          itemBuilder: (context, index) {
+                            final profile = _searchResults[index];
+                            final name = profile['full_name'] as String? ?? 'Usuario';
+                            final otherUserId = profile['id'] as String;
+                            final avatarUrl = profile['avatar_url'] as String?;
+                            final initials = name.trim().isNotEmpty
+                                ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+                                : 'LX';
+                            final color = AppColors.avatarColors[otherUserId.hashCode.abs() % AppColors.avatarColors.length];
 
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                            leading: CircleAvatar(
-                              backgroundColor: color.withValues(alpha: 0.12),
-                              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                                  ? NetworkImage(avatarUrl)
-                                  : null,
-                              child: avatarUrl == null || avatarUrl.isEmpty
-                                  ? Text(
-                                      initials,
-                                      style: TextStyle(color: color, fontWeight: FontWeight.bold),
-                                    )
-                                  : null,
-                            ),
-                            title: Text(
-                              name,
-                              style: const TextStyle(
-                                color: AppColors.onSurface,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                              leading: CircleAvatar(
+                                backgroundColor: color.withValues(alpha: 0.12),
+                                backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                    ? NetworkImage(avatarUrl)
+                                    : null,
+                                child: avatarUrl == null || avatarUrl.isEmpty
+                                    ? Text(
+                                        initials,
+                                        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                                      )
+                                    : null,
                               ),
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.onSurfaceMuted),
-                            onTap: () async {
-                              HapticFeedback.lightImpact();
-                              final currentUserId = ref.read(authProvider).user?.id ?? '';
-                              
-                              // Buscar o crear la sala de chat en Supabase
-                              final conversationId = await ref.read(chatServiceProvider).getOrCreateConversation(currentUserId, otherUserId);
-
-                              if (!context.mounted) return;
-                              Navigator.pop(context);
-
-                              // Mapear a entidad ChatEntity temporal
-                              final chat = ChatEntity(
-                                id: conversationId,
-                                name: name,
-                                initials: initials,
-                                avatarColorIndex: otherUserId.hashCode.abs(),
-                                lastMessage: '',
-                                lastMessageTime: DateTime.now(),
-                                unreadCount: 0,
-                                isOnline: false,
-                                messages: const [],
-                              );
-
-                              // Navegar al chat
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatDetailScreen(chat: chat),
+                              title: Text(
+                                name,
+                                style: const TextStyle(
+                                  color: AppColors.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
                                 ),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                              ),
+                              trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.onSurfaceMuted),
+                              onTap: () async {
+                                HapticFeedback.lightImpact();
+                                final currentUserId = ref.read(authProvider).user?.id ?? '';
+                                
+                                // Buscar o crear la sala de chat en Supabase
+                                final conversationId = await ref.read(chatServiceProvider).getOrCreateConversation(currentUserId, otherUserId);
+
+                                if (!context.mounted) return;
+                                Navigator.pop(context);
+
+                                // Mapear a entidad ChatEntity temporal
+                                final chat = ChatEntity(
+                                  id: conversationId,
+                                  name: name,
+                                  initials: initials,
+                                  avatarColorIndex: otherUserId.hashCode.abs(),
+                                  lastMessage: '',
+                                  lastMessageTime: DateTime.now(),
+                                  unreadCount: 0,
+                                  isOnline: false,
+                                  messages: const [],
+                                );
+
+                                // Navegar al chat
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatDetailScreen(chat: chat),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+            ),
           ),
         ],
       ),
