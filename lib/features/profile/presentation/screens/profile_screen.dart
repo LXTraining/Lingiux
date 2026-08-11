@@ -16,6 +16,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../chat/domain/entities/chat_entity.dart';
 import '../providers/profile_provider.dart';
 import 'settings_screen.dart';
+import '../../../lessons/presentation/providers/lessons_provider.dart';
+import '../../../lessons/domain/models/lesson_model.dart';
 
 final userBioProvider = FutureProvider.family.autoDispose<String, String>((ref, userId) async {
   final prefs = await SharedPreferences.getInstance();
@@ -44,7 +46,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  int _activeTabIndex = 0; // 0 for grid, 1 for stats
+  int _activeTabIndex = 0; // 0: Mis Cartas, 1: Mis Lecciones, 2: Mi Progreso
   late final PageController _pageController;
 
   @override
@@ -560,38 +562,42 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ],
 
-                  // Pestañas de Selección de Vista (Cápsula deslizable premium)
+                  // Pestañas de Selección de Vista (Cápsula deslizable de 3 pestañas premium)
                   const SizedBox(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: GestureDetector(
                       onHorizontalDragEnd: (details) {
                         if (details.primaryVelocity != null) {
-                          if (details.primaryVelocity! < -200 && _activeTabIndex == 0) {
-                            // Deslizar hacia la izquierda: ir a pestaña 1 (Mi Progreso)
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _activeTabIndex = 1;
-                            });
-                            if (_pageController.hasClients) {
-                              _pageController.animateToPage(
-                                1,
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeInOut,
-                              );
+                          if (details.primaryVelocity! < -200) {
+                            // Deslizar hacia la izquierda (avanzar tab)
+                            if (_activeTabIndex < 2) {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _activeTabIndex++;
+                              });
+                              if (_pageController.hasClients) {
+                                _pageController.animateToPage(
+                                  _activeTabIndex,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
                             }
-                          } else if (details.primaryVelocity! > 200 && _activeTabIndex == 1) {
-                            // Deslizar hacia la derecha: ir a pestaña 0 (Mis Cartas)
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _activeTabIndex = 0;
-                            });
-                            if (_pageController.hasClients) {
-                              _pageController.animateToPage(
-                                0,
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeInOut,
-                              );
+                          } else if (details.primaryVelocity! > 200) {
+                            // Deslizar hacia la derecha (retroceder tab)
+                            if (_activeTabIndex > 0) {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _activeTabIndex--;
+                              });
+                              if (_pageController.hasClients) {
+                                _pageController.animateToPage(
+                                  _activeTabIndex,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
                             }
                           }
                         }
@@ -609,8 +615,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         child: LayoutBuilder(
                           builder: (context, constraints) {
                             final totalWidth = constraints.maxWidth;
-                            final pillWidth = totalWidth / 2 - 2;
-                            final leftOffset = _activeTabIndex == 0 ? 2.0 : (totalWidth / 2);
+                            final pillWidth = totalWidth / 3 - 2;
+                            final leftOffset = _activeTabIndex == 0 
+                                ? 2.0 
+                                : (_activeTabIndex == 1 ? (totalWidth / 3) : (totalWidth * 2 / 3));
                             
                             return Stack(
                               fit: StackFit.expand,
@@ -664,14 +672,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                               Icon(
                                                 Icons.collections_bookmark_rounded,
                                                 color: _activeTabIndex == 0 ? Colors.white : AppColors.onSurfaceMuted,
-                                                size: 18,
+                                                size: 15,
                                               ),
-                                              const SizedBox(width: 8),
+                                              const SizedBox(width: 4),
                                               Text(
                                                 'Mis Cartas',
                                                 style: TextStyle(
                                                   color: _activeTabIndex == 0 ? Colors.white : AppColors.onSurfaceMuted,
-                                                  fontSize: 12,
+                                                  fontSize: 10,
                                                   fontWeight: FontWeight.bold,
                                                   fontFamily: 'Inter',
                                                 ),
@@ -681,7 +689,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         ),
                                       ),
                                     ),
-                                    // Tab 1: Mi Progreso
+                                    // Tab 1: Mis Lecciones
                                     Expanded(
                                       child: GestureDetector(
                                         onTap: () {
@@ -703,16 +711,57 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
                                               Icon(
-                                                Icons.leaderboard_rounded,
+                                                Icons.map_rounded,
                                                 color: _activeTabIndex == 1 ? Colors.white : AppColors.onSurfaceMuted,
-                                                size: 18,
+                                                size: 15,
                                               ),
-                                              const SizedBox(width: 8),
+                                              const SizedBox(width: 4),
                                               Text(
-                                                'Mi Progreso',
+                                                'Mis Lecciones',
                                                 style: TextStyle(
                                                   color: _activeTabIndex == 1 ? Colors.white : AppColors.onSurfaceMuted,
-                                                  fontSize: 12,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'Inter',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Tab 2: Mi Progreso
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          setState(() {
+                                            _activeTabIndex = 2;
+                                          });
+                                          if (_pageController.hasClients) {
+                                            _pageController.animateToPage(
+                                              2,
+                                              duration: const Duration(milliseconds: 250),
+                                              curve: Curves.easeInOut,
+                                            );
+                                          }
+                                        },
+                                        child: Container(
+                                          color: Colors.transparent,
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.leaderboard_rounded,
+                                                color: _activeTabIndex == 2 ? Colors.white : AppColors.onSurfaceMuted,
+                                                size: 15,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Progreso',
+                                                style: TextStyle(
+                                                  color: _activeTabIndex == 2 ? Colors.white : AppColors.onSurfaceMuted,
+                                                  fontSize: 10,
                                                   fontWeight: FontWeight.bold,
                                                   fontFamily: 'Inter',
                                                 ),
@@ -767,24 +816,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             languages.add('INGLÉS');
                           }
                           final languageList = languages.toList()..sort();
-                          final statsHeight = (languageList.length * 80.0) + 60.0;
-
-                          final contentHeight = _activeTabIndex == 0 ? gridHeight : statsHeight;
-
-                          return AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeInOut,
-                            height: contentHeight,
-                            child: PageView(
-                              controller: _pageController,
-                              onPageChanged: (index) {
-                                HapticFeedback.selectionClick();
-                                setState(() {
-                                  _activeTabIndex = index;
-                                });
-                              },
-                              children: [
-                                // Página 0: Grid de Cartas Creadas
+                           final statsHeight = (languageList.length * 80.0) + 60.0;
+  
+                           final userLessonsAsync = ref.watch(userLessonsProvider(effectiveUserId ?? ''));
+                           final userLessons = userLessonsAsync.value ?? [];
+                           const double rowHeight = 150.0;
+                           final lessonsHeight = userLessons.isEmpty ? 200.0 : (userLessons.length * rowHeight) + 40.0;
+  
+                           final contentHeight = _activeTabIndex == 0 
+                               ? gridHeight 
+                               : (_activeTabIndex == 1 ? lessonsHeight : statsHeight);
+  
+                           return AnimatedContainer(
+                             duration: const Duration(milliseconds: 200),
+                             curve: Curves.easeInOut,
+                             height: contentHeight,
+                             child: PageView(
+                               controller: _pageController,
+                               onPageChanged: (index) {
+                                 HapticFeedback.selectionClick();
+                                 setState(() {
+                                   _activeTabIndex = index;
+                                 });
+                               },
+                               children: [
+                                 // Página 0: Grid de Cartas Creadas
                                 Padding(
                                   padding: const EdgeInsets.all(8.0),
                                   child: userCards.isEmpty
@@ -863,7 +919,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                           },
                                         ),
                                 ),
-                                // Página 1: Estadísticas por Idioma
+                                // Página 1: Caminito de Lecciones Creadas
+                                _buildLessonsPathTab(context, userLessons, fullName, avatarUrl),
+
+                                // Página 2: Estadísticas por Idioma (Mi Progreso)
                                 Padding(
                                   padding: const EdgeInsets.all(16.0),
                                   child: Column(
@@ -1302,6 +1361,566 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildLessonsPathTab(
+    BuildContext context,
+    List<LessonModel> lessons,
+    String creatorName,
+    String? creatorAvatar,
+  ) {
+    if (lessons.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(48.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.map_outlined, size: 48, color: AppColors.onSurfaceMuted),
+              SizedBox(height: 12),
+              Text(
+                'No has creado ninguna lección aún.',
+                style: TextStyle(color: AppColors.onSurfaceMuted),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    const double rowHeight = 150.0;
+    const double nodeSize = 80.0;
+    const double cardHeight = 76.0;
+
+    // Camino ondulado idéntico al feed
+    final xFractions = [0.25, 0.65, 0.35, 0.70, 0.40, 0.65];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final totalHeight = lessons.length * rowHeight + 40.0;
+
+        return SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(), // Scroll gestionado por el Scaffold padre
+          child: Stack(
+            children: [
+              // 1. Camino dibujado con CustomPaint
+              SizedBox(
+                width: width,
+                height: totalHeight,
+                child: CustomPaint(
+                  painter: _ProfilePathPainter(
+                    xFractions: xFractions,
+                    rowHeight: rowHeight,
+                    itemCount: lessons.length,
+                  ),
+                ),
+              ),
+
+              // 2. Elementos del camino
+              SizedBox(
+                width: width,
+                height: totalHeight,
+                child: Stack(
+                  children: [
+                    for (int index = 0; index < lessons.length; index++) ...[
+                      // Tarjeta de la lección
+                      Positioned(
+                        top: (index * rowHeight + rowHeight / 2) - cardHeight / 2,
+                        left: (xFractions[index % xFractions.length] < 0.5)
+                            ? (width * xFractions[index % xFractions.length]) + nodeSize / 2 + 10
+                            : 20,
+                        right: (xFractions[index % xFractions.length] < 0.5)
+                            ? 20
+                            : (width - (width * xFractions[index % xFractions.length])) + nodeSize / 2 + 10,
+                        child: _buildProfileLessonCard(
+                          context,
+                          lessons[index],
+                          (xFractions[index % xFractions.length] < 0.5),
+                          cardHeight,
+                          creatorName,
+                        ),
+                      ),
+                      // Nodo interactivo de la lección
+                      Positioned(
+                        left: (width * xFractions[index % xFractions.length]) - nodeSize / 2,
+                        top: (index * rowHeight + rowHeight / 2) - nodeSize / 2,
+                        child: _ProfileLessonNode(
+                          lesson: lessons[index],
+                          size: nodeSize,
+                          gradientIndex: index,
+                          onTap: () => _showProfileLessonDetailsBottomSheet(context, lessons[index], creatorName, creatorAvatar),
+                        ),
+                      ),
+                    ]
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileLessonCard(
+    BuildContext context,
+    LessonModel lesson,
+    bool isLeft,
+    double cardHeight,
+    String creatorName,
+  ) {
+    return Container(
+      height: cardHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: isLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        children: [
+          Text(
+            lesson.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.onSurface,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Por $creatorName',
+            style: const TextStyle(
+              color: AppColors.onSurfaceMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showProfileLessonDetailsBottomSheet(
+    BuildContext context,
+    LessonModel lesson,
+    String creatorName,
+    String? creatorAvatar,
+  ) {
+    HapticFeedback.mediumImpact();
+    final gradients = [
+      [const Color(0xFF815BF5), const Color(0xFF5A45FF)],
+      [const Color(0xFFFF6B8B), const Color(0xFFFF8E53)],
+      [const Color(0xFFA258F5), const Color(0xFFF558C9)],
+      [const Color(0xFF4FA4F4), const Color(0xFF4CD9A3)],
+    ];
+    final colorIndex = lesson.title.hashCode.abs() % gradients.length;
+    final gradient = gradients[colorIndex];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 20,
+                offset: Offset(0, -5),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 14,
+            bottom: 32,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: gradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.map_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              lesson.language,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.border.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                lesson.difficulty,
+                                style: const TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.onSurfaceMuted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          lesson.title,
+                          style: const TextStyle(
+                            color: AppColors.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Por $creatorName',
+                          style: const TextStyle(
+                            color: AppColors.onSurfaceMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (lesson.description != null && lesson.description!.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Text(
+                  lesson.description!,
+                  style: const TextStyle(
+                    color: AppColors.onSurface,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildStatItem('${lesson.exercises.length}', 'Ejercicios'),
+                  _buildStatItem('${lesson.cardIds.length}', 'Semillas'),
+                ],
+              ),
+              const SizedBox(height: 28),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('🎮 ¡Próximamente podrás jugar tus propias lecciones! Estamos preparando el motor de juegos.'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: gradient[0],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'PROBAR LECCIÓN',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatItem(String value, String label) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.onSurface,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Inter',
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.onSurfaceMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfilePathPainter extends CustomPainter {
+  final List<double> xFractions;
+  final double rowHeight;
+  final int itemCount;
+
+  _ProfilePathPainter({
+    required this.xFractions,
+    required this.rowHeight,
+    required this.itemCount,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (itemCount == 0) return;
+
+    final path = Path();
+    double startX = size.width * xFractions[0];
+    double startY = rowHeight / 2;
+
+    path.moveTo(startX, startY);
+
+    for (int i = 1; i < itemCount; i++) {
+      double endX = size.width * xFractions[i % xFractions.length];
+      double endY = i * rowHeight + rowHeight / 2;
+
+      double controlY1 = startY + rowHeight * 0.45;
+      double controlY2 = endY - rowHeight * 0.45;
+
+      path.cubicTo(startX, controlY1, endX, controlY2, endX, endY);
+
+      startX = endX;
+      startY = endY;
+    }
+
+    final shadowPaint = Paint()
+      ..color = AppColors.border.withValues(alpha: 0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, shadowPaint);
+
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        colors: [
+          Color(0xFF815BF5),
+          Color(0xFFFF6B8B),
+          Color(0xFF4FA4F4),
+          Color(0xFFA258F5),
+          Color(0xFF815BF5),
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5.0
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProfilePathPainter oldDelegate) => false;
+}
+
+class _ProfileLessonNode extends StatefulWidget {
+  final LessonModel lesson;
+  final double size;
+  final int gradientIndex;
+  final VoidCallback onTap;
+
+  const _ProfileLessonNode({
+    required this.lesson,
+    required this.size,
+    required this.gradientIndex,
+    required this.onTap,
+  });
+
+  @override
+  State<_ProfileLessonNode> createState() => _ProfileLessonNodeState();
+}
+
+class _ProfileLessonNodeState extends State<_ProfileLessonNode> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = widget.size;
+
+    final gradients = [
+      [const Color(0xFF815BF5), const Color(0xFF5A45FF)],
+      [const Color(0xFFFF6B8B), const Color(0xFFFF8E53)],
+      [const Color(0xFFA258F5), const Color(0xFFF558C9)],
+      [const Color(0xFF4FA4F4), const Color(0xFF4CD9A3)],
+    ];
+    final colors = gradients[widget.gradientIndex % gradients.length];
+
+    final depthColor = Color.alphaBlend(Colors.black.withValues(alpha: 0.25), colors[1]);
+
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() => _isPressed = true);
+        HapticFeedback.lightImpact();
+      },
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () {
+        setState(() => _isPressed = false);
+      },
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 80),
+              width: size - 14,
+              height: size - 14,
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    top: 6,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: depthColor,
+                      ),
+                    ),
+                  ),
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 60),
+                    left: 0,
+                    right: 0,
+                    top: _isPressed ? 6 : 0,
+                    bottom: _isPressed ? 0 : 6,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: colors,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          if (!_isPressed)
+                            BoxShadow(
+                              color: colors[0].withValues(alpha: 0.35),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          _getLanguageFlag(widget.lesson.language),
+                          style: const TextStyle(fontSize: 26),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getLanguageFlag(String language) {
+    switch (language.toLowerCase()) {
+      case 'inglés':
+      case 'ingles':
+      case 'english':
+        return '🇺🇸';
+      case 'alemán':
+      case 'aleman':
+      case 'german':
+        return '🇩🇪';
+      case 'francés':
+      case 'frances':
+      case 'french':
+        return '🇫🇷';
+      case 'italiano':
+      case 'italian':
+        return '🇮🇹';
+      case 'portugués':
+      case 'portugues':
+      case 'portuguese':
+        return '🇧🇷';
+      default:
+        return '🌐';
+    }
   }
 }
 

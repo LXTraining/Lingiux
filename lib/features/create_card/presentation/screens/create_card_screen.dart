@@ -6,8 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../widgets/step_word_identity.dart';
-import '../widgets/card_editor_widget.dart';
 import '../../../home/presentation/providers/navigation_provider.dart';
+import '../../../lessons/presentation/screens/create_lesson_wizard_screen.dart';
+import '../widgets/card_editor_widget.dart';
 
 class CreateCardScreen extends ConsumerStatefulWidget {
   final bool isActive;
@@ -375,9 +376,13 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                             subtitle: 'CAMINOS',
                             icon: Icons.map_rounded,
                             gradient: const [Color(0xFFFF6B8B), Color(0xFFFF8E53)],
-                            isFuture: true,
                             onTap: () {
-                              _showFutureFeatureSnackbar(context, 'Crear Lección');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CreateLessonWizardScreen(),
+                                ),
+                              );
                             },
                           ),
                         ),
@@ -398,52 +403,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                       ],
                     ),
                     
-                    const SizedBox(height: 28),
-                    
-                    // Borradores y Recientes
-                    const Text(
-                      'Borradores y Recientes',
-                      style: TextStyle(
-                        color: AppColors.onSurface,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    Expanded(
-                      child: ListView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.only(bottom: 24),
-                        children: [
-                          _buildRecentItemCard(
-                            title: 'Phrasal Verbs de Viaje',
-                            type: 'Carta de Vocabulario',
-                            date: 'Borrador · Modificado ayer',
-                            icon: Icons.auto_awesome_motion_rounded,
-                            iconColor: const Color(0xFF815BF5),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildRecentItemCard(
-                            title: 'Pedir café en París 🇫🇷',
-                            type: 'Lección Interactiva',
-                            date: 'Borrador · Creado hace 3 días',
-                            icon: Icons.map_rounded,
-                            iconColor: const Color(0xFFFF6B8B),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildRecentItemCard(
-                            title: 'Diálogo: Check-in Hotel',
-                            type: 'Relato de Audio',
-                            date: 'Publicado · 28 de Julio',
-                            icon: Icons.auto_stories_rounded,
-                            iconColor: const Color(0xFF4FA4F4),
-                            isPublished: true,
-                          ),
-                        ],
-                      ),
-                    ),
+                    const Spacer(),
                   ],
                 ),
               ),
@@ -725,98 +685,6 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
     );
   }
 
-  Widget _buildRecentItemCard({
-    required String title,
-    required String type,
-    required String date,
-    required IconData icon,
-    required Color iconColor,
-    bool isPublished = false,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border.withOpacity(0.8), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.008),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.onSurface,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-                const SizedBox(height: 3),
-                // Usamos Text.rich con maxLines y ellipsis para evitar desbordamiento horizontal
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: type,
-                        style: TextStyle(
-                          color: iconColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const TextSpan(
-                        text: '  •  ',
-                        style: TextStyle(color: AppColors.onSurfaceMuted),
-                      ),
-                      TextSpan(
-                        text: date,
-                        style: const TextStyle(color: AppColors.onSurfaceMuted),
-                      ),
-                    ],
-                  ),
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontFamily: 'Inter',
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Icon(
-            isPublished ? Icons.more_vert_rounded : Icons.edit_rounded,
-            color: AppColors.onSurfaceMuted,
-            size: 18,
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showFutureFeatureSnackbar(BuildContext context, String featureName) {
     ScaffoldMessenger.of(context).showSnackBar(
