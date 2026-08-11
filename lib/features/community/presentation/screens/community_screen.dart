@@ -705,18 +705,19 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       color: AppColors.background,
       child: Stack(
         children: [
-          // Fondo degradado espacial premium original RESTAURADO
+          // Fondo degradado premium sutil que cubre toda la pantalla (Opción A mejorada)
+          // Se desvanece hacia un azul celeste pastel muy suave (8% opacidad) en la base en lugar de blanco puro.
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    AppColors.gradientBgStart.withValues(alpha: 0.55),
-                    AppColors.gradientBgEnd.withValues(alpha: 0.55),
-                    AppColors.darkBackground,
+                    AppColors.gradientBgStart.withValues(alpha: 0.45),
+                    AppColors.gradientBgEnd.withValues(alpha: 0.35),
+                    AppColors.gradientBgEnd.withValues(alpha: 0.08),
                   ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
               ),
             ),
@@ -999,9 +1000,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.surfaceVariant.withValues(alpha: 0.4),
+        color: Colors.white.withValues(alpha: 0.65),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.2)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1024,13 +1025,13 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 HapticFeedback.selectionClick();
                 onChanged(val);
               },
-              dropdownColor: AppColors.darkBackground,
+              dropdownColor: AppColors.surface,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.onSurface,
                 fontSize: 10.5,
                 fontWeight: FontWeight.bold,
               ),
-              icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white, size: 16),
+              icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.onSurfaceMuted, size: 16),
               isDense: true,
             ),
           ),
@@ -1806,21 +1807,14 @@ class VocabularyGraphPainter extends CustomPainter {
         }
       }
 
-      // Dibujar texto del Label debajo del nodo
+      // Dibujar texto del Label debajo del nodo (Opción A - Estilo badge minimalista claro)
       final textSpan = TextSpan(
         text: node.label,
         style: TextStyle(
-          color: Colors.white,
+          color: AppColors.onSurface,
           fontSize: isCategory ? 11.0 : 8.5,
           fontWeight: isCategory ? FontWeight.bold : FontWeight.w600,
           fontFamily: 'Inter',
-          shadows: const [
-            Shadow(
-              color: Colors.black87,
-              offset: Offset(0, 1),
-              blurRadius: 2.0,
-            ),
-          ],
         ),
       );
 
@@ -1834,16 +1828,27 @@ class VocabularyGraphPainter extends CustomPainter {
         node.position.dy + radius + 4,
       );
 
-      // Dibujar caja contenedora semi-translúcida para mayor contraste y legibilidad
+      // Dibujar caja contenedora blanca semi-translúcida con borde sutil para máximo contraste y elegancia
       final bgRect = Rect.fromLTWH(
-        textOffset.dx - 5,
-        textOffset.dy - 1,
-        textPainter.width + 10,
-        textPainter.height + 2,
+        textOffset.dx - 6,
+        textOffset.dy - 2,
+        textPainter.width + 12,
+        textPainter.height + 4,
       );
+      
+      // Relleno de la caja
       canvas.drawRRect(
-        RRect.fromRectAndRadius(bgRect, const Radius.circular(5)),
-        Paint()..color = Colors.black.withValues(alpha: 0.45),
+        RRect.fromRectAndRadius(bgRect, const Radius.circular(6)),
+        Paint()..color = Colors.white.withValues(alpha: 0.90),
+      );
+      
+      // Borde fino de la caja
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bgRect, const Radius.circular(6)),
+        Paint()
+          ..color = AppColors.border
+          ..strokeWidth = 0.8
+          ..style = PaintingStyle.stroke,
       );
 
       textPainter.paint(canvas, textOffset);
