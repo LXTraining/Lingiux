@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,11 +10,30 @@ import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../home/presentation/providers/navigation_provider.dart';
 
-class FeedScreen extends ConsumerWidget {
+class FeedScreen extends ConsumerStatefulWidget {
   const FeedScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FeedScreen> createState() => _FeedScreenState();
+}
+
+class _FeedScreenState extends ConsumerState<FeedScreen> {
+  late ValueNotifier<double> _sheetExtentNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    _sheetExtentNotifier = ValueNotifier<double>(0.55);
+  }
+
+  @override
+  void dispose() {
+    _sheetExtentNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Degradado oficial morado/índigo estático
     const gradientColors = [Color(0xFF7C3AED), Color(0xFF4F46E5)];
 
@@ -154,66 +175,123 @@ class FeedScreen extends ConsumerWidget {
             ),
             body: LayoutBuilder(
               builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                const double rowHeight = 150.0;
-                const double nodeSize = 80.0;
-                const double cardHeight = 76.0;
-                final totalHeight = mockLessons.length * rowHeight + 40.0;
+                final bodyHeight = constraints.maxHeight;
+                final tamagotchiHeight = bodyHeight * 0.45;
 
-                // Fracciones de alineación X para el caminito ondulado
-                final xFractions = [0.25, 0.65, 0.35, 0.70, 0.40, 0.65];
+                return Stack(
+                  children: [
+                    // 1. Tamagotchi Widget en el fondo (ocupa la mitad superior, ~45%)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: tamagotchiHeight,
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: _sheetExtentNotifier,
+                        builder: (context, extent, child) {
+                          final tamagotchiOpacity = ((1.0 - extent) / (1.0 - 0.55)).clamp(0.0, 1.0);
+                          final scale = 0.8 + 0.2 * tamagotchiOpacity;
+                          final offset = -50.0 * (1.0 - tamagotchiOpacity);
 
-                return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.only(top: 16, bottom: 40),
-                  child: Stack(
-                    children: [
-                      // 1. El camino dibujado con CustomPaint
-                      Positioned.fill(
-                        child: CustomPaint(
-                          size: Size(width, totalHeight),
-                          painter: PathPainter(
-                            xFractions: xFractions,
-                            rowHeight: rowHeight,
-                            itemCount: mockLessons.length,
-                          ),
+                          return Opacity(
+                            opacity: tamagotchiOpacity,
+                            child: Transform.translate(
+                              offset: Offset(0, offset),
+                              child: Transform.scale(
+                                scale: scale,
+                                child: const TamagotchiWidget(),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // 2. El panel deslizable transparente (DraggableScrollableSheet)
+                    Positioned.fill(
+                      child: NotificationListener<DraggableScrollableNotification>(
+                        onNotification: (notification) {
+                          _sheetExtentNotifier.value = notification.extent;
+                          return true;
+                        },
+                        child: DraggableScrollableSheet(
+                          initialChildSize: 0.55,
+                          minChildSize: 0.55,
+                          maxChildSize: 1.0,
+                          snap: true,
+                          snapSizes: const [0.55, 1.0],
+                          builder: (context, scrollController) {
+                            return LayoutBuilder(
+                              builder: (context, constraints) {
+                                final width = constraints.maxWidth;
+                                const double rowHeight = 150.0;
+                                const double nodeSize = 80.0;
+                                const double cardHeight = 76.0;
+                                final totalHeight = mockLessons.length * rowHeight + 40.0;
+
+                                // Fracciones de alineación X para el caminito ondulado
+                                final xFractions = [0.25, 0.65, 0.35, 0.70, 0.40, 0.65];
+
+                                return SingleChildScrollView(
+                                  controller: scrollController,
+                                  physics: const ClampingScrollPhysics(),
+                                  padding: const EdgeInsets.only(top: 16, bottom: 40),
+                                  child: Stack(
+                                    children: [
+                                      // 1. El camino dibujado con CustomPaint
+                                      Positioned.fill(
+                                        child: CustomPaint(
+                                          size: Size(width, totalHeight),
+                                          painter: PathPainter(
+                                            xFractions: xFractions,
+                                            rowHeight: rowHeight,
+                                            itemCount: mockLessons.length,
+                                          ),
+                                        ),
+                                      ),
+
+                                      // 2. Elementos posicionados
+                                      SizedBox(
+                                        width: width,
+                                        height: totalHeight,
+                                        child: Stack(
+                                          children: [
+                                            for (int index = 0; index < mockLessons.length; index++) ...[
+                                              // Tarjeta informativa de la lección
+                                              Positioned(
+                                                top: (index * rowHeight + rowHeight / 2) - cardHeight / 2,
+                                                left: (xFractions[index % xFractions.length] < 0.5)
+                                                    ? (width * xFractions[index % xFractions.length]) + nodeSize / 2 + 10
+                                                    : 20,
+                                                right: (xFractions[index % xFractions.length] < 0.5)
+                                                    ? 20
+                                                    : (width - (width * xFractions[index % xFractions.length])) + nodeSize / 2 + 10,
+                                                child: _buildLessonCard(context, mockLessons[index], (xFractions[index % xFractions.length] < 0.5), cardHeight),
+                                              ),
+                                              // Nodo interactivo de la lección
+                                              Positioned(
+                                                left: (width * xFractions[index % xFractions.length]) - nodeSize / 2,
+                                                top: (index * rowHeight + rowHeight / 2) - nodeSize / 2,
+                                                child: LessonNode(
+                                                  lesson: mockLessons[index],
+                                                  size: nodeSize,
+                                                  onTap: () => _showLessonDetailsBottomSheet(context, mockLessons[index]),
+                                                ),
+                                              ),
+                                            ]
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
                         ),
                       ),
-
-                      // 2. Elementos posicionados
-                      SizedBox(
-                        width: width,
-                        height: totalHeight,
-                        child: Stack(
-                          children: [
-                            for (int index = 0; index < mockLessons.length; index++) ...[
-                              // Tarjeta informativa de la lección
-                              Positioned(
-                                top: (index * rowHeight + rowHeight / 2) - cardHeight / 2,
-                                left: (xFractions[index % xFractions.length] < 0.5)
-                                    ? (width * xFractions[index % xFractions.length]) + nodeSize / 2 + 10
-                                    : 20,
-                                right: (xFractions[index % xFractions.length] < 0.5)
-                                    ? 20
-                                    : (width - (width * xFractions[index % xFractions.length])) + nodeSize / 2 + 10,
-                                child: _buildLessonCard(context, mockLessons[index], (xFractions[index % xFractions.length] < 0.5), cardHeight),
-                              ),
-                              // Nodo interactivo de la lección
-                              Positioned(
-                                left: (width * xFractions[index % xFractions.length]) - nodeSize / 2,
-                                top: (index * rowHeight + rowHeight / 2) - nodeSize / 2,
-                                child: LessonNode(
-                                  lesson: mockLessons[index],
-                                  size: nodeSize,
-                                  onTap: () => _showLessonDetailsBottomSheet(context, mockLessons[index]),
-                                ),
-                              ),
-                            ]
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -985,4 +1063,474 @@ final mockLessons = [
     gradient: [Color(0xFF815BF5), Color(0xFF4FA4F4)],
   ),
 ];
+
+// ==========================================
+// WIDGET TAMAGOTCHI INTERACTIVO DE INICIO
+// ==========================================
+
+class TamagotchiWidget extends StatefulWidget {
+  const TamagotchiWidget({super.key});
+
+  @override
+  State<TamagotchiWidget> createState() => _TamagotchiWidgetState();
+}
+
+class _TamagotchiWidgetState extends State<TamagotchiWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _floatAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _rotateAnimation;
+
+  String _currentSpeech = '¡Hola! Ayúdame a nacer completando tu caminito.';
+  bool _isPressed = false;
+
+  final List<String> _speeches = [
+    '¡Zzz... Lingui está soñando con verbos en inglés!',
+    '¡Hola! Cada lección que completas me da energía.',
+    '¡Mmm... creo que hoy es un gran día para practicar modismos!',
+    '¡Brr! Siento que mi cascarón se agrieta con tu conocimiento.',
+    '¡Hii! ¿Sabías que hablar un idioma nuevo abre un cerebro extra?',
+    '¡Pst! Si completas tu racha de hoy, tendré un regalo para ti.',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
+
+    _floatAnimation = Tween<double>(begin: 0.0, end: -8.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _rotateAnimation = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.linear,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapMascot() {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isPressed = true;
+      // Seleccionar un mensaje aleatorio distinto al actual
+      final random = math.Random();
+      String nextSpeech;
+      do {
+        nextSpeech = _speeches[random.nextInt(_speeches.length)];
+      } while (nextSpeech == _currentSpeech && _speeches.length > 1);
+      _currentSpeech = nextSpeech;
+    });
+
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) {
+        setState(() {
+          _isPressed = false;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // 1. Partículas/círculos decorativos de fondo con brillos suaves
+        Positioned(
+          top: 30,
+          left: 50,
+          child: _buildGlowingBubble(16, AppColors.gradientBgStart.withOpacity(0.2)),
+        ),
+        Positioned(
+          bottom: 40,
+          right: 60,
+          child: _buildGlowingBubble(24, AppColors.gradientBgEnd.withOpacity(0.15)),
+        ),
+        Positioned(
+          top: 70,
+          right: 40,
+          child: _buildGlowingBubble(12, Colors.white.withOpacity(0.3)),
+        ),
+
+        // 2. Pedestal / Plataforma
+        Positioned(
+          bottom: 30,
+          child: Container(
+            width: 150,
+            height: 20,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.all(Radius.elliptical(150, 20)),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.4),
+                  Colors.white.withOpacity(0.1),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.6),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.15),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // 3. Mascota Flotante (Huevo con auras y anillos de órbita)
+        Positioned(
+          bottom: 38,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _floatAnimation.value),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Huevo e Interacción
+                    GestureDetector(
+                      onTap: _onTapMascot,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Aura trasera resplandeciente
+                          Container(
+                            width: 75,
+                            height: 95,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.35),
+                                  blurRadius: 25,
+                                  spreadRadius: 5,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Anillo orbital rotando
+                          Transform.rotate(
+                            angle: _rotateAnimation.value,
+                            child: CustomPaint(
+                              size: const Size(120, 120),
+                              painter: OrbitalRingPainter(),
+                            ),
+                          ),
+
+                          // Huevo de aprendizaje (cuerpo principal)
+                          AnimatedScale(
+                            scale: _isPressed ? 0.85 : _scaleAnimation.value,
+                            duration: const Duration(milliseconds: 150),
+                            curve: Curves.easeOutBack,
+                            child: Container(
+                              width: 65,
+                              height: 85,
+                              decoration: BoxDecoration(
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(45),
+                                  topRight: Radius.circular(45),
+                                  bottomLeft: Radius.circular(35),
+                                  bottomRight: Radius.circular(35),
+                                ),
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF9E7CFF),
+                                    Color(0xFFFF8FA3),
+                                    Color(0xFF5BA2F4),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.7),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Stack(
+                                children: [
+                                  // Reflejo de luz en el huevo para darle tridimensionalidad
+                                  Positioned(
+                                    top: 8,
+                                    left: 12,
+                                    child: Container(
+                                      width: 14,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.35),
+                                        borderRadius: const BorderRadius.all(
+                                          Radius.elliptical(7, 12),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Detalle de carita durmiendo (ojitos y boquita)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(top: 10.0),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text('◡', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, height: 1.0)),
+                                              SizedBox(width: 10),
+                                              Text('◡', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, height: 1.0)),
+                                            ],
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text('o', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, height: 1.0)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Nombre y estadísticas debajo
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.border,
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.egg_rounded, color: AppColors.primary, size: 12),
+                          SizedBox(width: 4),
+                          Text(
+                            'NV. 1: Huevo Lingui',
+                            style: TextStyle(
+                              color: AppColors.onSurface,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Barra de evolución
+                    SizedBox(
+                      width: 110,
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Evolución',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: AppColors.onSurfaceMuted,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                              Text(
+                                '40%',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: AppColors.primary.withOpacity(0.8),
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: SizedBox(
+                              height: 4,
+                              child: LinearProgressIndicator(
+                                value: 0.4,
+                                backgroundColor: AppColors.border,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+
+        // 4. Globo de Diálogo Flotante (Speech Balloon)
+        Positioned(
+          top: 15,
+          child: AnimatedOpacity(
+            opacity: 1.0,
+            duration: const Duration(milliseconds: 300),
+            child: Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 240),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    _currentSpeech,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.onSurface,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Inter',
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: -5,
+                  child: Transform.rotate(
+                    angle: math.pi / 4,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGlowingBubble(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+      ),
+    );
+  }
+}
+
+// Pintor del anillo orbital con guiones futuristas
+class OrbitalRingPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    // Dibujar el anillo de forma elíptica inclinada
+    final rect = Rect.fromCenter(
+      center: center,
+      width: size.width,
+      height: size.height * 0.35,
+    );
+
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    // Crear un camino punteado/discontinuo
+    final path = Path()..addOval(rect);
+    
+    // Inclinamos el lienzo un poco para darle perspectiva 3D
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(-0.25); // Inclinación orbital
+    canvas.translate(-center.dx, -center.dy);
+    
+    // Dibujamos con línea punteada manual o dibujando pequeños arcos
+    const double dashWidth = 5;
+    const double dashSpace = 5;
+    
+    // Usamos path metrics para cortar en guiones
+    for (final metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final length = math.min(dashWidth, metric.length - distance);
+        final extract = metric.extractPath(distance, distance + length);
+        canvas.drawPath(extract, paint);
+        distance += dashWidth + dashSpace;
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
 
