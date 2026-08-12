@@ -107,7 +107,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final cardController = FlippableCardController();
 
     _overlayEntry = OverlayEntry(
-      builder: (_) => _OverlayEntrance(
+      builder: (_) => OverlayEntrance(
         isBelow: isBelow,
         left: left,
         top: top,
@@ -1657,7 +1657,7 @@ class FlippableCardController {
       _state?.toggleCard(swipeRight: swipeRight);
 }
 
-class _OverlayEntrance extends StatefulWidget {
+class OverlayEntrance extends StatefulWidget {
   final Widget child;
   final bool isBelow;
   final double left;
@@ -1666,7 +1666,7 @@ class _OverlayEntrance extends StatefulWidget {
   final VoidCallback onShare;
   final GestureDragEndCallback? onHorizontalDragEnd;
 
-  const _OverlayEntrance({
+  const OverlayEntrance({
     required this.child,
     required this.isBelow,
     required this.left,
@@ -1677,10 +1677,10 @@ class _OverlayEntrance extends StatefulWidget {
   });
 
   @override
-  State<_OverlayEntrance> createState() => _OverlayEntranceState();
+  State<OverlayEntrance> createState() => _OverlayEntranceState();
 }
 
-class _OverlayEntranceState extends State<_OverlayEntrance>
+class _OverlayEntranceState extends State<OverlayEntrance>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;

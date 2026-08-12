@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,12 +14,16 @@ class MessageBubble extends ConsumerWidget {
   final MessageEntity message;
   final String conversationId;
   final Function(String messageId, String word, Offset globalPosition, Size wordSize) onWordTap;
+  final String? senderName;
+  final String? senderAvatar;
 
   const MessageBubble({
     super.key,
     required this.message,
     required this.conversationId,
     required this.onWordTap,
+    this.senderName,
+    this.senderAvatar,
   });
 
   @override
@@ -40,44 +45,77 @@ class MessageBubble extends ConsumerWidget {
         right: isMe ? 0 : 56,
       ),
       child: Column(
-        crossAxisAlignment:
-            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: isMe
-                  ? const LinearGradient(
-                      colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: isMe ? null : AppColors.surface,
-              border: isMe ? null : Border.all(color: AppColors.border, width: 1),
-              boxShadow: isMe
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(18),
-                topRight: const Radius.circular(18),
-                bottomLeft: Radius.circular(isMe ? 18 : 4),
-                bottomRight: Radius.circular(isMe ? 4 : 18),
+          if (!isMe && senderName != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 42.0, bottom: 4.0),
+              child: Text(
+                senderName!,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.onSurfaceMuted,
+                ),
               ),
             ),
-            child: Wrap(
-              children: _buildWordWidgets(message.text, isMe),
-            ),
+          Row(
+            mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!isMe && senderName != null) ...[
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppColors.border,
+                  backgroundImage: senderAvatar != null ? NetworkImage(senderAvatar!) : null,
+                  child: senderAvatar == null
+                      ? Text(
+                          senderName!.substring(0, 1).toUpperCase(),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: isMe
+                        ? const LinearGradient(
+                            colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: isMe ? null : AppColors.surface,
+                    border: isMe ? null : Border.all(color: AppColors.border, width: 1),
+                    boxShadow: isMe
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.02),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(18),
+                      topRight: const Radius.circular(18),
+                      bottomLeft: Radius.circular(isMe ? 18 : 4),
+                      bottomRight: Radius.circular(isMe ? 4 : 18),
+                    ),
+                  ),
+                  child: Wrap(
+                    children: _buildWordWidgets(message.text, isMe),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 3),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.only(right: 4, left: (!isMe && senderName != null) ? 42.0 : 4.0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -186,103 +224,136 @@ class MessageBubble extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            // 1. La Carta Flippable centradita con detector de deslizamiento
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onHorizontalDragStart: (_) {}, // Bloquea el PageView del chat
-              onHorizontalDragUpdate: (_) {}, // Bloquea el PageView del chat
-              onHorizontalDragEnd: (details) {
-                if (details.primaryVelocity != null &&
-                    details.primaryVelocity!.abs() > 200) {
-                  final swipeRight = details.primaryVelocity! > 0;
-                  cardController.flip(swipeRight: swipeRight);
-                  HapticFeedback.selectionClick();
-                }
-              },
-              child: SizedBox(
-                width: 96,
-                height: 144, // 136px card + 8px arrow
-                child: FlippableCard(
-                  controller: cardController,
-                  isBelow: false, // La flecha está abajo apuntando al texto
-                  arrowLeft: 48.0, // Eje central
-                  front: WordMiniCardFront(
-                    word: word,
-                    card: specificCard,
-                    onTap: navigateToDetail,
-                  ),
-                  back: WordMiniCardBack(
-                    word: word,
-                    card: specificCard,
-                    onTap: navigateToDetail,
-                  ),
-                ),
-              ),
-            ),
-            
-            // 2. El globito de la palabra abajo
-            const SizedBox(height: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: isMe
-                    ? const LinearGradient(
-                        colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isMe ? null : AppColors.surface,
-                border: isMe ? null : Border.all(color: AppColors.border, width: 1),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isMe
-                    ? [
-                        BoxShadow(
-                          color: const Color(0xFF815BF5).withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-              ),
-              child: Text(
-                word,
-                style: TextStyle(
-                  color: isMe ? Colors.white : AppColors.onSurface,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ),
-            
-            // 3. Hora y check
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-              children: [
-                Text(
-                  formatMessageTime(message.time),
+            if (!isMe && senderName != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 42.0, bottom: 4.0),
+                child: Text(
+                  senderName!,
                   style: const TextStyle(
-                    color: AppColors.onSurfaceMuted,
                     fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurfaceMuted,
                   ),
                 ),
-                if (message.isMe) ...[
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.done_all_rounded,
-                    size: 12,
-                    color: AppColors.primary,
+              ),
+            Row(
+              mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!isMe && senderName != null) ...[
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.border,
+                    backgroundImage: senderAvatar != null ? NetworkImage(senderAvatar!) : null,
+                    child: senderAvatar == null
+                        ? Text(
+                            senderName!.substring(0, 1).toUpperCase(),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          )
+                        : null,
                   ),
+                  const SizedBox(width: 8),
                 ],
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onHorizontalDragStart: (_) {},
+                        onHorizontalDragUpdate: (_) {},
+                        onHorizontalDragEnd: (details) {
+                          if (details.primaryVelocity != null &&
+                              details.primaryVelocity!.abs() > 200) {
+                            final swipeRight = details.primaryVelocity! > 0;
+                            cardController.flip(swipeRight: swipeRight);
+                            HapticFeedback.selectionClick();
+                          }
+                        },
+                        child: SizedBox(
+                          width: 96,
+                          height: 144,
+                          child: FlippableCard(
+                            controller: cardController,
+                            isBelow: false,
+                            arrowLeft: 48.0,
+                            front: WordMiniCardFront(
+                              word: word,
+                              card: specificCard,
+                              onTap: navigateToDetail,
+                            ),
+                            back: WordMiniCardBack(
+                              word: word,
+                              card: specificCard,
+                              onTap: navigateToDetail,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          gradient: isMe
+                              ? const LinearGradient(
+                                  colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                          color: isMe ? null : AppColors.surface,
+                          border: isMe ? null : Border.all(color: AppColors.border, width: 1),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: isMe
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF815BF5).withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.02),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                        ),
+                        child: Text(
+                          word,
+                          style: TextStyle(
+                            color: isMe ? Colors.white : AppColors.onSurface,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            formatMessageTime(message.time),
+                            style: const TextStyle(
+                              color: AppColors.onSurfaceMuted,
+                              fontSize: 10,
+                            ),
+                          ),
+                          if (message.isMe) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.done_all_rounded,
+                              size: 12,
+                              color: AppColors.primary,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ],

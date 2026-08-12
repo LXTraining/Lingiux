@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../domain/entities/chat_entity.dart';
+import '../../domain/entities/study_group.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import 'chat_detail_screen.dart';
+import 'group_detail_screen.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_strings.dart';
 import '../../../../../core/utils/formatters.dart';
@@ -20,6 +22,16 @@ class ChatsListScreen extends ConsumerStatefulWidget {
 class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
   int _activeSegment = 0; // 0 = Mensajes, 1 = Grupos
   final Set<String> _cachedAvatarUrls = {};
+
+  void _showCreateGroupModal(BuildContext context) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _CreateGroupSheet(),
+    );
+  }
 
   final List<Map<String, dynamic>> _mockPracticedCards = const [
     {
@@ -241,6 +253,12 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
             appBar: AppBar(
               title: const Text(AppStrings.mensajes),
               actions: [
+                if (_activeSegment == 1)
+                  IconButton(
+                    icon: const Icon(Icons.add_box_outlined, color: AppColors.primary),
+                    tooltip: 'Crear Grupo',
+                    onPressed: () => _showCreateGroupModal(context),
+                  ),
                 IconButton(
                   icon: const Icon(Icons.search_rounded),
                   onPressed: () => _showSearchUsersModal(context),
@@ -248,6 +266,14 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
                 const SizedBox(width: 4),
               ],
             ),
+            floatingActionButton: _activeSegment == 1
+                ? FloatingActionButton.extended(
+                    onPressed: () => _showCreateGroupModal(context),
+                    backgroundColor: AppColors.primary,
+                    icon: const Icon(Icons.add_rounded, color: Colors.white),
+                    label: const Text('Crear Grupo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  )
+                : null,
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -270,52 +296,88 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
                   const SizedBox(height: 16),
                 ],
                 
-                // Listado de Chats
+                // Listado de Chats o Grupos
                 Expanded(
-                  child: chatsAsync.when(
-                    data: (chats) {
-                      if (hasUncachedImages) {
-                        return ListView.builder(
-                          itemCount: 6,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemBuilder: (context, index) => const _ChatListTileSkeleton(),
-                        );
-                      }
+                  child: _activeSegment == 0
+                      ? chatsAsync.when(
+                          data: (chats) {
+                            if (hasUncachedImages) {
+                              return ListView.builder(
+                                itemCount: 6,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemBuilder: (context, index) => const _ChatListTileSkeleton(),
+                              );
+                            }
 
-                      if (chats.isEmpty) {
-                        return const _EmptyChats();
-                      }
-                      return ListView.builder(
-                        itemCount: chats.length,
-                        padding: const EdgeInsets.only(bottom: 20),
-                        itemBuilder: (context, index) {
-                          final chat = chats[index];
-                          return _ChatListTile(
-                            chat: chat,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChatDetailScreen(chat: chat),
-                              ),
+                            if (chats.isEmpty) {
+                              return const _EmptyChats();
+                            }
+                            return ListView.builder(
+                              itemCount: chats.length,
+                              padding: const EdgeInsets.only(bottom: 20),
+                              itemBuilder: (context, index) {
+                                final chat = chats[index];
+                                return _ChatListTile(
+                                  chat: chat,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatDetailScreen(chat: chat),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                          loading: () => ListView.builder(
+                            itemCount: 6,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemBuilder: (context, index) => const _ChatListTileSkeleton(),
+                          ),
+                          error: (error, stack) => Center(
+                            child: Text(
+                              'Error al cargar chats: $error',
+                              style: const TextStyle(color: AppColors.error),
                             ),
-                          );
-                        },
-                      );
-                    },
-                    loading: () => ListView.builder(
-                      itemCount: 6,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemBuilder: (context, index) => const _ChatListTileSkeleton(),
-                    ),
-                    error: (error, stack) => Center(
-                      child: Text(
-                        'Error al cargar chats: $error',
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    ),
-                  ),
+                          ),
+                        )
+                      : ref.watch(userGroupsProvider).when(
+                          data: (groups) {
+                            if (groups.isEmpty) {
+                              return const _EmptyGroups();
+                            }
+                            return ListView.builder(
+                              itemCount: groups.length,
+                              padding: const EdgeInsets.only(bottom: 20),
+                              itemBuilder: (context, index) {
+                                final group = groups[index];
+                                return _GroupListTile(
+                                  group: group,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => GroupDetailScreen(group: group),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                          loading: () => ListView.builder(
+                            itemCount: 6,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemBuilder: (context, index) => const _ChatListTileSkeleton(),
+                          ),
+                          error: (error, stack) => Center(
+                            child: Text(
+                              'Error al cargar grupos: $error',
+                              style: const TextStyle(color: AppColors.error),
+                            ),
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -979,6 +1041,409 @@ class _SearchUsersSheetState extends ConsumerState<_SearchUsersSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EmptyGroups extends StatelessWidget {
+  const _EmptyGroups();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.groups_2_outlined,
+            size: 64,
+            color: AppColors.onSurfaceMuted,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'No tienes grupos de estudio',
+            style: TextStyle(
+              color: AppColors.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Inter',
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Crea un grupo para cooperar con tus amigos',
+            style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupListTile extends StatelessWidget {
+  final StudyGroupModel group;
+  final VoidCallback onTap;
+
+  const _GroupListTile({
+    required this.group,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPlant = group.growthType == 'PLANT';
+    final colors = isPlant
+        ? const [Color(0xFF10B981), Color(0xFF059669)]
+        : const [Color(0xFF815BF5), Color(0xFF5A45FF)];
+
+    final depthColor = Color.alphaBlend(Colors.black.withOpacity(0.25), colors[1]);
+    final shadowColor = colors[0].withOpacity(0.2);
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned(
+                    left: 0, right: 0, bottom: 0, top: 4,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black12,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0, right: 0, bottom: 2, top: 2,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: depthColor,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0, right: 0, top: 0, bottom: 4,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: colors,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: shadowColor,
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(
+                          isPlant ? Icons.local_florist_rounded : Icons.pets_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    group.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.onSurface,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    group.description ?? 'Sin descripción',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.onSurfaceMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: colors[0].withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Nivel ${group.level}',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: colors[0],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateGroupSheet extends ConsumerStatefulWidget {
+  const _CreateGroupSheet();
+
+  @override
+  ConsumerState<_CreateGroupSheet> createState() => _CreateGroupSheetState();
+}
+
+class _CreateGroupSheetState extends ConsumerState<_CreateGroupSheet> {
+  final _nameController = TextEditingController();
+  final _descController = TextEditingController();
+  String _growthType = 'PLANT';
+  bool _isCreating = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createGroup() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, ingresa el nombre del grupo.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isCreating = true);
+    HapticFeedback.mediumImpact();
+
+    try {
+      final userId = ref.read(authProvider).user?.id ?? '';
+      await ref.read(chatServiceProvider).createGroup(
+            name: name,
+            description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+            growthType: _growthType,
+            creatorId: userId,
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Grupo de estudio creado con éxito! 🎉'),
+            backgroundColor: AppColors.online,
+          ),
+        );
+        Navigator.pop(context);
+        ref.invalidate(userGroupsProvider);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al crear grupo: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 20,
+        bottom: 24 + bottomInset,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4.5,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'Nuevo Grupo de Estudio',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
+                fontFamily: 'Inter',
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              style: const TextStyle(color: AppColors.onSurface),
+              decoration: const InputDecoration(
+                labelText: 'Nombre del salón / grupo',
+                hintText: 'Ej: Salón de Francés B1 🇫🇷',
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            TextField(
+              controller: _descController,
+              style: const TextStyle(color: AppColors.onSurface),
+              decoration: const InputDecoration(
+                labelText: 'Descripción (Opcional)',
+                hintText: 'Ej: Grupo para cooperar y subir de nivel la planta.',
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'Mascota Cooperativa',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.onSurfaceMuted,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => _growthType = 'PLANT');
+                      HapticFeedback.lightImpact();
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: _growthType == 'PLANT' ? const Color(0xFFD1FAE5) : Colors.grey.shade50,
+                        border: Border.all(
+                          color: _growthType == 'PLANT' ? const Color(0xFF10B981) : AppColors.border,
+                          width: _growthType == 'PLANT' ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: const [
+                          Icon(Icons.local_florist_rounded, color: Color(0xFF047857), size: 32),
+                          SizedBox(height: 8),
+                          Text(
+                            'Planta de Racha',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF047857),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => _growthType = 'TAMAGOTCHI');
+                      HapticFeedback.lightImpact();
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: _growthType == 'TAMAGOTCHI' ? const Color(0xFFEDE9FE) : Colors.grey.shade50,
+                        border: Border.all(
+                          color: _growthType == 'TAMAGOTCHI' ? const Color(0xFF815BF5) : AppColors.border,
+                          width: _growthType == 'TAMAGOTCHI' ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: const [
+                          Icon(Icons.pets_rounded, color: Color(0xFF6D28D9), size: 32),
+                          SizedBox(height: 8),
+                          Text(
+                            'Tamagotchi Grupal',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6D28D9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              onPressed: _isCreating ? null : _createGroup,
+              child: _isCreating
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('CREAR GRUPO Y ACCEDER', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }
