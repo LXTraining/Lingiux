@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1757,12 +1758,29 @@ class _ProfilePathPainter extends CustomPainter {
       startY = endY;
     }
 
+    // Convertir el camino continuo a punteado (dashed)
+    final dashedPath = Path();
+    const double dashWidth = 12.0;
+    const double dashSpace = 8.0;
+
+    for (final metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final length = math.min(dashWidth, metric.length - distance);
+        dashedPath.addPath(
+          metric.extractPath(distance, distance + length),
+          Offset.zero,
+        );
+        distance += dashWidth + dashSpace;
+      }
+    }
+
     final shadowPaint = Paint()
       ..color = AppColors.border.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 9.0
       ..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, shadowPaint);
+    canvas.drawPath(dashedPath, shadowPaint);
 
     final paint = Paint()
       ..shader = const LinearGradient(
@@ -1780,7 +1798,7 @@ class _ProfilePathPainter extends CustomPainter {
       ..strokeWidth = 5.0
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawPath(path, paint);
+    canvas.drawPath(dashedPath, paint);
   }
 
   @override

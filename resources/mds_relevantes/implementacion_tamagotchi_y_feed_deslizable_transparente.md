@@ -40,8 +40,10 @@ lingiux_app/
 │       │           └── home_screen.dart   <-- Controla el scaffold principal y el BottomNavigationBar
 │       └── profile/
 │           └── presentation/
-│               └── providers/
-│                   └── profile_provider.dart
+│               ├── providers/
+│               │   └── profile_provider.dart
+│               └── screens/
+│                   └── profile_screen.dart   <-- [Pantalla Modificada] Pestaña de lecciones con caminito punteado
 └── resources/
     └── mds_relevantes/
         └── implementacion_tamagotchi_y_feed_deslizable_transparente.md <-- Este documento
@@ -251,6 +253,7 @@ Se aplicó un degradado premium de tres colores (Morado, Rosa, Celeste) junto co
 3. **Optimización Háptica y Animaciones No Bloqueantes:** El temporizador de retroalimentación de escala de rebote y el cambio de textos se ejecutan de manera asíncrona no bloqueante usando `Future.delayed` y respetando el estado de montaje del widget (`mounted`).
 4. **Perspectiva con Operaciones de Canvas Limpias:** La perspectiva 3D del anillo orbital se logra mediante transformaciones matriciales locales encapsuladas (`canvas.save()` y `canvas.restore()`), lo que no interfiere con el pintado de otros elementos gráficos de la pantalla.
 5. **Cero Dependencias Externas Adicionales:** Se implementaron gestos, físicas y animaciones complejas usando componentes 100% nativos del framework SDK de Flutter, previniendo problemas de compatibilidad y tamaño del bundle.
+6. **Optimización Gráfica en Líneas Punteadas (PathPainter):** Para renderizar la línea discontinua del camino, en lugar de invocar `canvas.drawPath` en cada paso del bucle (lo cual multiplicaría los draw calls y degradaría el rendimiento de renderizado en pantallas de alta densidad), subdividimos la curva Bezier continua original del camino utilizando `PathMetrics` y agregamos todos los segmentos individuales en un solo objeto `Path` consolidado (`dashedPath`). Esto permite pintar el camino y su sombra en tan solo dos draw calls totales sobre el canvas, manteniendo al mismo tiempo un degradado lineal que fluye de forma continua entre cada guion.
 
 ---
 
