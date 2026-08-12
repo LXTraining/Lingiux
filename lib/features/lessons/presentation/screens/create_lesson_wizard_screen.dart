@@ -7,10 +7,12 @@ import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../providers/lessons_provider.dart';
 import '../../domain/compiler/lesson_compiler.dart';
 import '../../domain/models/lesson_exercise_model.dart';
+import '../../domain/models/lesson_model.dart';
 import '../../../../core/constants/app_colors.dart';
 
 class CreateLessonWizardScreen extends ConsumerStatefulWidget {
-  const CreateLessonWizardScreen({super.key});
+  final LessonModel? lessonToEdit;
+  const CreateLessonWizardScreen({super.key, this.lessonToEdit});
 
   @override
   ConsumerState<CreateLessonWizardScreen> createState() => _CreateLessonWizardScreenState();
@@ -19,6 +21,8 @@ class CreateLessonWizardScreen extends ConsumerStatefulWidget {
 class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScreen> {
   int _currentStep = 0; // 0: Metadatos, 1: Selección de Cartas, 2: Organizador de Ejercicios
   bool _isSaving = false;
+  String? _editingLessonId;
+  bool _showAdvancedSettings = false;
 
   // STEP 0: METADATOS
   final _titleController = TextEditingController();
@@ -28,6 +32,16 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
 
   final List<String> _languages = const ['Inglés', 'Alemán', 'Francés', 'Italiano', 'Portugués'];
   final List<String> _difficulties = const ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.lessonToEdit != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadLessonForEditing(widget.lessonToEdit!);
+      });
+    }
+  }
 
   // STEP 1: SELECCIÓN DE CARTAS
   final Set<String> _selectedCardIds = {};
@@ -40,6 +54,307 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  void _loadLessonForEditing(LessonModel lesson) {
+    setState(() {
+      _editingLessonId = lesson.id;
+      _titleController.text = lesson.title;
+      _descriptionController.text = lesson.description ?? '';
+      _selectedLanguage = lesson.language;
+      _selectedDifficulty = lesson.difficulty;
+      _selectedCardIds.clear();
+      _selectedCardIds.addAll(lesson.cardIds);
+      _exercises = List<LessonExerciseModel>.from(lesson.exercises);
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _clearEditingMode() {
+    setState(() {
+      _editingLessonId = null;
+      _titleController.clear();
+      _descriptionController.clear();
+      _selectedLanguage = 'Inglés';
+      _selectedDifficulty = 'A1';
+      _selectedCardIds.clear();
+      _exercises.clear();
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _confirmDeleteLesson(String lessonId) {
+    HapticFeedback.vibrate();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar lección?'),
+        content: const Text('Esta acción es irreversible y eliminará la lección de la plataforma.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              setState(() => _isSaving = true);
+              try {
+                await ref.read(lessonServiceProvider).deleteLesson(lessonId);
+                ref.invalidate(lessonsListProvider);
+                final creatorId = ref.read(authProvider).user?.id ?? '';
+                ref.invalidate(userLessonsProvider(creatorId));
+                
+                if (_editingLessonId == lessonId) {
+                  _clearEditingMode();
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Lección eliminada con éxito.'),
+                    backgroundColor: AppColors.online,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error al eliminar lección: $e'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              } finally {
+                setState(() => _isSaving = false);
+              }
+            },
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Color> _getGradientForDifficulty(String difficulty) {
+    switch (difficulty) {
+      case 'A1':
+      case 'A2':
+        return const [Color(0xFF815BF5), Color(0xFF5A45FF)];
+      case 'B1':
+      case 'B2':
+        return const [Color(0xFFFF6B8B), Color(0xFFFF8E53)];
+      default:
+        return const [Color(0xFF4FA4F4), Color(0xFF4CD9A3)];
+    }
+  }
+
+  Widget _buildLessonNodePreview({required String title, required String difficulty}) {
+    final colors = _getGradientForDifficulty(difficulty);
+    final depthColor = Color.alphaBlend(Colors.black.withOpacity(0.25), colors[1]);
+    final shadowColor = colors[0].withOpacity(0.25);
+
+    return Container(
+      width: 100,
+      height: 100,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: 6,
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black26,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 4,
+            top: 2,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: depthColor,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 6,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: colors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: shadowColor,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.menu_book_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDraftsList(List<LessonModel> lessons) {
+    if (lessons.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        alignment: Alignment.center,
+        child: Text(
+          'Aún no tienes lecciones creadas.',
+          style: TextStyle(color: AppColors.onSurfaceMuted.withOpacity(0.7), fontSize: 13),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 1.4,
+      ),
+      itemCount: lessons.length,
+      itemBuilder: (context, index) {
+        final lesson = lessons[index];
+        final isSelected = _editingLessonId == lesson.id;
+        final colors = _getGradientForDifficulty(lesson.difficulty);
+        final depthColor = Color.alphaBlend(Colors.black.withOpacity(0.2), colors[1]);
+
+        return GestureDetector(
+          onTap: () => _loadLessonForEditing(lesson),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.white : Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isSelected ? AppColors.primary : AppColors.border.withOpacity(0.6),
+                width: isSelected ? 2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isSelected
+                      ? AppColors.primary.withOpacity(0.12)
+                      : Colors.black.withOpacity(0.01),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Stack(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Positioned(
+                                left: 0, right: 0, top: 2, bottom: 0,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: depthColor,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 0, right: 0, top: 0, bottom: 2,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: colors,
+                                    ),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(Icons.menu_book_rounded, color: Colors.white, size: 14),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colors[0].withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            lesson.difficulty,
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              color: colors[0],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      lesson.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ],
+                ),
+                Positioned(
+                  top: -6,
+                  right: -6,
+                  child: IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 18),
+                    onPressed: () => _confirmDeleteLesson(lesson.id),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _nextStep(List<WordCardModel> userCards) {
@@ -100,27 +415,42 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
 
     try {
       final creatorId = ref.read(authProvider).user?.id ?? '';
-      await ref.read(lessonServiceProvider).saveLesson(
-            creatorId: creatorId,
-            title: _titleController.text.trim(),
-            description: _descriptionController.text.trim(),
-            language: _selectedLanguage,
-            difficulty: _selectedDifficulty,
-            cardIds: _selectedCardIds.toList(),
-            exercisesJson: _exercises.map((e) => e.toJson()).toList(),
-          );
+      if (_editingLessonId != null) {
+        await ref.read(lessonServiceProvider).updateLesson(
+              lessonId: _editingLessonId!,
+              title: _titleController.text.trim(),
+              description: _descriptionController.text.trim(),
+              language: _selectedLanguage,
+              difficulty: _selectedDifficulty,
+              cardIds: _selectedCardIds.toList(),
+              exercisesJson: _exercises.map((e) => e.toJson()).toList(),
+            );
+      } else {
+        await ref.read(lessonServiceProvider).saveLesson(
+              creatorId: creatorId,
+              title: _titleController.text.trim(),
+              description: _descriptionController.text.trim(),
+              language: _selectedLanguage,
+              difficulty: _selectedDifficulty,
+              cardIds: _selectedCardIds.toList(),
+              exercisesJson: _exercises.map((e) => e.toJson()).toList(),
+            );
+      }
 
       // Refrescar lista de lecciones si es necesario
       ref.invalidate(lessonsListProvider);
+      ref.invalidate(userLessonsProvider(creatorId));
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.check_circle_outline_rounded, color: Colors.white),
-              SizedBox(width: 10),
-              Text('¡Lección publicada con éxito! 🚀'),
+              const Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+              const SizedBox(width: 10),
+              Text(_editingLessonId != null
+                  ? '¡Lección actualizada con éxito! 🚀'
+                  : '¡Lección publicada con éxito! 🚀'),
             ],
           ),
           backgroundColor: AppColors.primary,
@@ -284,7 +614,8 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
                 ),
 
                 // Barra Inferior de Navegación
-                _buildBottomNavigation(userCards),
+                if (_currentStep > 0)
+                  _buildBottomNavigation(userCards),
               ],
             ),
           ),
@@ -302,14 +633,52 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
 
   // ENCABEZADO
   Widget _buildHeader() {
+    if (_currentStep == 0) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: const Icon(
+                Icons.arrow_back_ios_rounded,
+                color: AppColors.onSurfaceMuted,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _editingLessonId != null ? 'EDITAR LECCIÓN' : 'CREADOR LECCIÓN',
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                fontFamily: 'Inter',
+                letterSpacing: 1.0,
+              ),
+            ),
+            const Spacer(),
+            if (_editingLessonId != null)
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Nueva', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                onPressed: _clearEditingMode,
+              ),
+          ],
+        ),
+      );
+    }
+
     String stepTitle = '';
     double progress = 0.0;
 
     switch (_currentStep) {
-      case 0:
-        stepTitle = 'INFORMACIÓN DE LECCIÓN';
-        progress = 0.33;
-        break;
       case 1:
         stepTitle = 'SELECCIÓN DE CARTAS';
         progress = 0.66;
@@ -375,7 +744,7 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
   Widget _buildStepBody(List<WordCardModel> userCards) {
     switch (_currentStep) {
       case 0:
-        return _buildMetadataStep();
+        return _buildMetadataStep(userCards);
       case 1:
         return _buildCardSelectionStep(userCards);
       case 2:
@@ -385,106 +754,240 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
     }
   }
 
-  // PASO 0: METADATOS
-  Widget _buildMetadataStep() {
+  // PASO 0: METADATOS REDISEÑADO
+  Widget _buildMetadataStep(List<WordCardModel> userCards) {
+    final userId = ref.watch(authProvider).user?.id ?? '';
+    final userLessonsAsync = ref.watch(userLessonsProvider(userId));
+
     return SingleChildScrollView(
       key: const ValueKey('step0'),
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Text(
-            'Comencemos con lo básico',
-            style: TextStyle(
+          const SizedBox(height: 12),
+          Text(
+            _editingLessonId != null ? 'EDITANDO LECCIÓN' : 'NUEVA LECCIÓN',
+            style: const TextStyle(
               color: AppColors.onSurface,
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
               fontFamily: 'Inter',
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Nombra tu lección e indica el idioma y nivel de dificultad para que la comunidad sepa de qué trata.',
-            style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 13),
+          const SizedBox(height: 16),
+
+          _buildLessonNodePreview(
+            title: _titleController.text.trim(),
+            difficulty: _selectedDifficulty,
           ),
           const SizedBox(height: 24),
 
-          // Título
-          const Text(
-            'TÍTULO DE LA LECCIÓN',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _titleController,
-            style: const TextStyle(color: AppColors.onSurface),
-            decoration: const InputDecoration(
-              hintText: 'Ej: Pedir comida en un restaurante 🍔',
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.015),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _titleController,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppColors.onSurface,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Inter',
+              ),
+              decoration: InputDecoration(
+                filled: false,
+                fillColor: Colors.transparent,
+                hintText: 'Nombre de Lección',
+                hintStyle: TextStyle(
+                  color: AppColors.onSurfaceMuted.withOpacity(0.7),
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Descripción
-          const Text(
-            'DESCRIPCIÓN (OPCIONAL)',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _descriptionController,
-            style: const TextStyle(color: AppColors.onSurface),
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'Ej: Aprende las frases de cortesía más usadas por los locales.',
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Selectores
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'IDIOMA',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedLanguage,
-                      items: _languages.map((l) {
-                        return DropdownMenuItem(value: l, child: Text(l));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedLanguage = val!),
-                    ),
-                  ],
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              title: Text(
+                'Ajustes adicionales (${_selectedLanguage} • ${_selectedDifficulty})',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  fontFamily: 'Inter',
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'NIVEL DE DIFICULTAD',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedDifficulty,
-                      items: _difficulties.map((d) {
-                        return DropdownMenuItem(value: d, child: Text(d));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedDifficulty = val!),
-                    ),
-                  ],
+              leading: const Icon(Icons.tune_rounded, color: AppColors.primary, size: 18),
+              trailing: Icon(
+                _showAdvancedSettings ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                color: AppColors.primary,
+              ),
+              onExpansionChanged: (val) {
+                setState(() => _showAdvancedSettings = val);
+              },
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedLanguage,
+                          decoration: InputDecoration(
+                            labelText: 'Idioma',
+                            labelStyle: const TextStyle(fontSize: 12, color: AppColors.onSurfaceMuted),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          items: _languages.map((l) {
+                            return DropdownMenuItem(value: l, child: Text(l, style: const TextStyle(fontSize: 13)));
+                          }).toList(),
+                          onChanged: (val) => setState(() => _selectedLanguage = val!),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedDifficulty,
+                          decoration: InputDecoration(
+                            labelText: 'Nivel',
+                            labelStyle: const TextStyle(fontSize: 12, color: AppColors.onSurfaceMuted),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          items: _difficulties.map((d) {
+                            return DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 13)));
+                          }).toList(),
+                          onChanged: (val) => setState(() => _selectedDifficulty = val!),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _descriptionController,
+                  style: const TextStyle(color: AppColors.onSurface, fontSize: 13),
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: 'Descripción (Opcional)',
+                    labelStyle: const TextStyle(fontSize: 12, color: AppColors.onSurfaceMuted),
+                    hintText: 'Ej: Aprende las frases de cortesía más usadas por los locales.',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _buildCheckmarkButton(userCards),
+          const SizedBox(height: 32),
+
+          Row(
+            children: [
+              const Text(
+                'LECCIONES EN CREACIÓN',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.onSurfaceMuted,
+                  letterSpacing: 1.0,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(width: 8),
+              userLessonsAsync.when(
+                data: (lessons) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.border.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${lessons.length}',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                  ),
+                ),
+                loading: () => const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1.5)),
+                error: (_, __) => const SizedBox(),
               ),
             ],
           ),
+          const SizedBox(height: 16),
+
+          userLessonsAsync.when(
+            data: (lessons) => _buildDraftsList(lessons),
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            ),
+            error: (err, _) => Center(
+              child: Text(
+                'Error al cargar lecciones: $err',
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ),
+          ),
+          const SizedBox(height: 40),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCheckmarkButton(List<WordCardModel> userCards) {
+    return GestureDetector(
+      onTap: () {
+        if (_titleController.text.trim().isEmpty) {
+          HapticFeedback.vibrate();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Por favor, ingresa un título para la lección.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          return;
+        }
+        _nextStep(userCards);
+      },
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.primary,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.check_rounded,
+          color: Colors.white,
+          size: 32,
+        ),
       ),
     );
   }

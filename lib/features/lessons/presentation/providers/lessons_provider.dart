@@ -30,6 +30,31 @@ class LessonService {
     });
   }
 
+  // Actualizar una lección existente en Supabase
+  Future<void> updateLesson({
+    required String lessonId,
+    required String title,
+    String? description,
+    required String language,
+    required String difficulty,
+    required List<String> cardIds,
+    required List<dynamic> exercisesJson,
+  }) async {
+    await _supabase.from('lessons').update({
+      'title': title,
+      'description': description,
+      'language': language,
+      'difficulty': difficulty,
+      'card_ids': cardIds,
+      'exercises': exercisesJson,
+    }).eq('id', lessonId);
+  }
+
+  // Eliminar una lección
+  Future<void> deleteLesson(String lessonId) async {
+    await _supabase.from('lessons').delete().eq('id', lessonId);
+  }
+
   // Obtener todas las lecciones ordenadas por fecha
   Future<List<LessonModel>> fetchLessons() async {
     final response = await _supabase
