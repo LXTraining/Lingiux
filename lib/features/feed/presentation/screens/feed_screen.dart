@@ -226,7 +226,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                 final width = constraints.maxWidth;
                                 const double rowHeight = 150.0;
                                 const double nodeSize = 80.0;
-                                const double cardHeight = 76.0;
+                                const double cardHeight = 92.0;
                                 final totalHeight = mockLessons.length * rowHeight + 40.0;
 
                                 // Fracciones de alineación X para el caminito ondulado
@@ -435,12 +435,29 @@ Widget _buildLessonCard(BuildContext context, Lesson lesson, bool isLeft, double
             fontFamily: 'Inter',
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
+        Row(
+          children: [
+            Expanded(
+              child: EchoCommentsWidget(
+                comments: isLocked
+                    ? const [
+                        LessonComment(
+                          text: "Opiniones bloqueadas 🔒",
+                          userName: "Sistema",
+                        ),
+                      ]
+                    : lesson.comments,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
         Text(
           'Por ${lesson.creatorName}',
           style: TextStyle(
             color: isLocked ? Colors.grey.shade500 : AppColors.onSurfaceMuted,
-            fontSize: 10,
+            fontSize: 9.5,
             fontWeight: FontWeight.w500,
             fontFamily: 'Inter',
           ),
@@ -448,6 +465,169 @@ Widget _buildLessonCard(BuildContext context, Lesson lesson, bool isLeft, double
       ],
     ),
   );
+}
+
+class EchoCommentsWidget extends StatefulWidget {
+  final List<LessonComment> comments;
+  const EchoCommentsWidget({super.key, required this.comments});
+
+  @override
+  State<EchoCommentsWidget> createState() => _EchoCommentsWidgetState();
+}
+
+class _EchoCommentsWidgetState extends State<EchoCommentsWidget> {
+  int _currentIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.comments.isNotEmpty) {
+      _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
+        if (mounted) {
+          setState(() {
+            _currentIndex = (_currentIndex + 1) % widget.comments.length;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.comments.isEmpty) return const SizedBox.shrink();
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 600),
+      reverseDuration: const Duration(milliseconds: 600),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        final offsetAnimation = Tween<Offset>(
+          begin: const Offset(0.0, 1.2),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+        ));
+
+        final fadeAnimation = Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeInOut,
+        ));
+
+        return SlideTransition(
+          position: offsetAnimation,
+          child: FadeTransition(
+            opacity: fadeAnimation,
+            child: child,
+          ),
+        );
+      },
+      layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+        return Stack(
+          alignment: Alignment.centerLeft,
+          children: <Widget>[
+            ...previousChildren,
+            if (currentChild != null) currentChild,
+          ],
+        );
+      },
+      child: _buildCommentRow(widget.comments[_currentIndex], _currentIndex),
+    );
+  }
+
+  Widget _buildCommentRow(LessonComment comment, int index) {
+    final isSystem = comment.userName == 'Sistema';
+
+    Widget avatarWidget;
+    if (isSystem) {
+      avatarWidget = Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.grey.shade300,
+        ),
+        child: const Icon(Icons.lock_rounded, size: 7, color: Colors.white),
+      );
+    } else {
+      avatarWidget = Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 0.8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 1.5,
+              offset: const Offset(0, 0.5),
+            ),
+          ],
+        ),
+        child: CircleAvatar(
+          radius: 7,
+          backgroundColor: AppColors.primary.withOpacity(0.15),
+          backgroundImage: comment.avatarUrl != null && comment.avatarUrl!.isNotEmpty
+              ? NetworkImage(comment.avatarUrl!)
+              : null,
+          child: comment.avatarUrl == null || comment.avatarUrl!.isEmpty
+              ? Text(
+                  comment.userName.isNotEmpty ? comment.userName[0].toUpperCase() : 'U',
+                  style: const TextStyle(fontSize: 5, color: Colors.white, fontWeight: FontWeight.bold),
+                )
+              : null,
+        ),
+      );
+    }
+
+    return Row(
+      key: ValueKey<int>(index),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        avatarWidget,
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                if (!isSystem)
+                  TextSpan(
+                    text: '${comment.userName}  ',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 9.0,
+                      color: AppColors.onSurface,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                TextSpan(
+                  text: comment.text,
+                  style: TextStyle(
+                    fontWeight: isSystem ? FontWeight.w500 : FontWeight.normal,
+                    fontStyle: isSystem ? FontStyle.normal : FontStyle.italic,
+                    fontSize: 9.0,
+                    color: isSystem ? Colors.grey.shade600 : const Color(0xFF6B7280),
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 void _showLessonDetailsBottomSheet(BuildContext context, Lesson lesson) {
@@ -780,6 +960,13 @@ class _LessonNodeState extends State<LessonNode> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
+                        image: !isLocked && lesson.imageUrl != null && lesson.imageUrl!.isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(lesson.imageUrl!),
+                                fit: BoxFit.cover,
+                                opacity: 0.35,
+                              )
+                            : null,
                         boxShadow: _isPressed
                             ? []
                             : [
@@ -982,6 +1169,18 @@ class PathPainter extends CustomPainter {
   bool shouldRepaint(covariant PathPainter oldDelegate) => false;
 }
 
+class LessonComment {
+  final String text;
+  final String userName;
+  final String? avatarUrl;
+
+  const LessonComment({
+    required this.text,
+    required this.userName,
+    this.avatarUrl,
+  });
+}
+
 class Lesson {
   final String id;
   final String title;
@@ -993,6 +1192,8 @@ class Lesson {
   final bool isLocked;
   final IconData icon;
   final List<Color> gradient;
+  final String? imageUrl;
+  final List<LessonComment> comments;
 
   const Lesson({
     required this.id,
@@ -1005,6 +1206,8 @@ class Lesson {
     required this.isLocked,
     required this.icon,
     required this.gradient,
+    this.imageUrl,
+    this.comments = const [],
   });
 }
 
@@ -1019,6 +1222,24 @@ final mockLessons = [
     isLocked: false,
     icon: Icons.chat_bubble_rounded,
     gradient: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+    imageUrl: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=150',
+    comments: [
+      LessonComment(
+        text: '¡Súper útil para viajar! ✈️',
+        userName: 'Carlos',
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Me salvó en mi última escala',
+        userName: 'Ana',
+        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Las frases suenan muy naturales',
+        userName: 'Sofía',
+        avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150',
+      ),
+    ],
   ),
   const Lesson(
     id: '2',
@@ -1031,6 +1252,24 @@ final mockLessons = [
     isLocked: false,
     icon: Icons.restaurant_rounded,
     gradient: [Color(0xFFFF6B8B), Color(0xFFFF8E53)],
+    imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=150',
+    comments: [
+      LessonComment(
+        text: '¡La mejor lección de comida! 🌮',
+        userName: 'Diego',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Ya sé pedir con todo 😂',
+        userName: 'Lucía',
+        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: '¡Amo los tacos al pastor!',
+        userName: 'Juan',
+        avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150',
+      ),
+    ],
   ),
   const Lesson(
     id: '3',
@@ -1043,6 +1282,24 @@ final mockLessons = [
     isLocked: false,
     icon: Icons.record_voice_over_rounded,
     gradient: [Color(0xFFA258F5), Color(0xFFF558C9)],
+    imageUrl: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=150',
+    comments: [
+      LessonComment(
+        text: '¡Altoke con esta lección! 🇨🇱',
+        userName: 'Mateo',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Slang chileno es desafiante',
+        userName: 'Valentina',
+        avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Muy divertida la explicación',
+        userName: 'Camila',
+        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150',
+      ),
+    ],
   ),
   const Lesson(
     id: '4',
@@ -1055,6 +1312,24 @@ final mockLessons = [
     isLocked: true,
     icon: Icons.work_rounded,
     gradient: [Color(0xFF4FA4F4), Color(0xFF4CD9A3)],
+    imageUrl: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=150',
+    comments: [
+      LessonComment(
+        text: '¡Crucial para juniors! 💻',
+        userName: 'Lucas',
+        avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Vocabulario técnico premium',
+        userName: 'Emma',
+        avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Me ayudó a prepararme',
+        userName: 'Benjamín',
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+      ),
+    ],
   ),
   const Lesson(
     id: '5',
@@ -1067,6 +1342,24 @@ final mockLessons = [
     isLocked: true,
     icon: Icons.favorite_rounded,
     gradient: [Color(0xFFFF6B8B), Color(0xFFF558C9)],
+    imageUrl: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=150',
+    comments: [
+      LessonComment(
+        text: 'Ouh la la, muy romántico 🌹',
+        userName: 'Chloé',
+        avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Frases súper coquetas',
+        userName: 'Pierre',
+        avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: '¡Jaja muy divertido!',
+        userName: 'Alice',
+        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150',
+      ),
+    ],
   ),
   const Lesson(
     id: '6',
@@ -1078,6 +1371,24 @@ final mockLessons = [
     isLocked: true,
     icon: Icons.flight_takeoff_rounded,
     gradient: [Color(0xFF815BF5), Color(0xFF4FA4F4)],
+    imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=150',
+    comments: [
+      LessonComment(
+        text: 'Indispensable para viajar ✈️',
+        userName: 'Felix',
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: 'Muy realista el vocabulario',
+        userName: 'Greta',
+        avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150',
+      ),
+      LessonComment(
+        text: '¡Me encanta el alemán!',
+        userName: 'Otto',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150',
+      ),
+    ],
   ),
 ];
 
