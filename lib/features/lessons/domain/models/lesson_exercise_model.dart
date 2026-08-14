@@ -52,4 +52,24 @@ class LessonExerciseModel {
       'correct_sequence': correctSequence,
     };
   }
+
+  LessonExerciseModel copyWith({
+    String? id,
+    ExerciseType? type,
+    String? question,
+    String? audioUrl,
+    String? correctAnswer,
+    List<String>? options,
+    List<String>? correctSequence,
+  }) {
+    return LessonExerciseModel(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      question: question ?? this.question,
+      audioUrl: audioUrl ?? this.audioUrl,
+      correctAnswer: correctAnswer ?? this.correctAnswer,
+      options: options ?? this.options,
+      correctSequence: correctSequence ?? this.correctSequence,
+    );
+  }
 }

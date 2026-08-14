@@ -5,7 +5,6 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../providers/lessons_provider.dart';
-import '../../domain/compiler/lesson_compiler.dart';
 import '../../domain/models/lesson_exercise_model.dart';
 import '../../domain/models/lesson_model.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -19,7 +18,7 @@ class CreateLessonWizardScreen extends ConsumerStatefulWidget {
 }
 
 class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScreen> {
-  int _currentStep = 0; // 0: Metadatos, 1: Selección de Cartas, 2: Organizador de Ejercicios
+  int _currentStep = 0; // 0: Metadatos, 1: Organizador de Ejercicios (Editor)
   bool _isSaving = false;
   String? _editingLessonId;
   bool _showAdvancedSettings = false;
@@ -48,6 +47,7 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
 
   // STEP 2: ORGANIZADOR DE EJERCICIOS
   List<LessonExerciseModel> _exercises = [];
+  int _selectedExerciseIndex = 0;
 
   @override
   void dispose() {
@@ -66,6 +66,7 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
       _selectedCardIds.clear();
       _selectedCardIds.addAll(lesson.cardIds);
       _exercises = List<LessonExerciseModel>.from(lesson.exercises);
+      _selectedExerciseIndex = 0;
     });
     HapticFeedback.lightImpact();
   }
@@ -79,6 +80,7 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
       _selectedDifficulty = 'A1';
       _selectedCardIds.clear();
       _exercises.clear();
+      _selectedExerciseIndex = 0;
     });
     HapticFeedback.lightImpact();
   }
@@ -368,25 +370,35 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
         );
         return;
       }
-      setState(() => _currentStep = 1);
-    } else if (_currentStep == 1) {
-      if (_selectedCardIds.length < 2) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor, selecciona al menos 2 cartas para auto-generar ejercicios.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
-      }
-
-      // Auto-generación de ejercicios usando el compilador inteligente
-      final selectedCards = userCards.where((c) => _selectedCardIds.contains(c.id)).toList();
-      final generated = LessonCompiler.compile(cards: selectedCards);
-
       setState(() {
-        _exercises = generated;
-        _currentStep = 2;
+        _currentStep = 1;
+        _selectedExerciseIndex = 0;
+        if (_exercises.isEmpty) {
+          _exercises = [
+            const LessonExerciseModel(
+              id: '1',
+              type: ExerciseType.multipleChoice,
+              question: 'Select the correct translation',
+              correctAnswer: 'Coffee',
+              options: ['Tea', 'Water', 'Coffee', 'Juice'],
+            ),
+            const LessonExerciseModel(
+              id: '2',
+              type: ExerciseType.translateSentence,
+              question: 'Translate: "I want a coffee"',
+              correctAnswer: 'I want a coffee',
+              correctSequence: ['I', 'want', 'a', 'coffee'],
+              options: ['I', 'want', 'a', 'coffee'],
+            ),
+            const LessonExerciseModel(
+              id: '3',
+              type: ExerciseType.listeningQuiz,
+              question: 'Listen and select the word',
+              correctAnswer: 'Coffee',
+              options: ['Tea', 'Water', 'Coffee', 'Juice'],
+            ),
+          ];
+        }
       });
     }
   }
@@ -472,103 +484,6 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
     }
   }
 
-  // DIÁLOGO PARA EDITAR EJERCICIO INDIVIDUAL
-  void _showEditExerciseDialog(int index) {
-    final exercise = _exercises[index];
-    final questionCtrl = TextEditingController(text: exercise.question);
-    final correctCtrl = TextEditingController(text: exercise.correctAnswer);
-
-    // Copias editables de opciones
-    final options = List<String>.from(exercise.options);
-    final optionCtrls = options.map((opt) => TextEditingController(text: opt)).toList();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Text(
-            'Editar Ejercicio (${_getExerciseTypeName(exercise.type)})',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: questionCtrl,
-                  decoration: const InputDecoration(labelText: 'Pregunta / Instrucción'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: correctCtrl,
-                  decoration: const InputDecoration(labelText: 'Respuesta Correcta'),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Opciones de Respuesta (Distractores):',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.onSurfaceMuted),
-                ),
-                const SizedBox(height: 8),
-                ...List.generate(optionCtrls.length, (idx) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: TextField(
-                      controller: optionCtrls[idx],
-                      decoration: InputDecoration(
-                        labelText: 'Opción ${idx + 1}',
-                        isDense: true,
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                final newOptions = optionCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
-
-                setState(() {
-                  _exercises[index] = LessonExerciseModel(
-                    id: exercise.id,
-                    type: exercise.type,
-                    question: questionCtrl.text.trim(),
-                    correctAnswer: correctCtrl.text.trim(),
-                    options: newOptions,
-                    audioUrl: exercise.audioUrl,
-                    correctSequence: exercise.correctSequence,
-                  );
-                });
-
-                Navigator.pop(context);
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
-    ).then((_) {
-      // Liberar controladores
-      questionCtrl.dispose();
-      correctCtrl.dispose();
-      for (final c in optionCtrls) {
-        c.dispose();
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final wordCardsAsync = ref.watch(correctWordCardsProvider);
@@ -612,10 +527,6 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
                     child: _buildStepBody(userCards),
                   ),
                 ),
-
-                // Barra Inferior de Navegación
-                if (_currentStep > 0)
-                  _buildBottomNavigation(userCards),
               ],
             ),
           ),
@@ -633,121 +544,87 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
 
   // ENCABEZADO
   Widget _buildHeader() {
-    if (_currentStep == 0) {
+    if (_currentStep == 1) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
         child: Row(
           children: [
             GestureDetector(
-              onTap: () => Navigator.pop(context),
+              onTap: _prevStep,
               child: const Icon(
                 Icons.arrow_back_ios_rounded,
-                color: AppColors.onSurfaceMuted,
+                color: AppColors.onSurface,
                 size: 20,
               ),
             ),
-            const SizedBox(width: 12),
-            Text(
-              _editingLessonId != null ? 'EDITAR LECCIÓN' : 'CREADOR LECCIÓN',
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                fontFamily: 'Inter',
-                letterSpacing: 1.0,
+            Expanded(
+              child: Text(
+                _titleController.text.trim().toUpperCase(),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontFamily: 'Inter',
+                  letterSpacing: 1.0,
+                ),
               ),
             ),
-            const Spacer(),
-            if (_editingLessonId != null)
-              TextButton.icon(
-                style: TextButton.styleFrom(
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                  foregroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Nueva', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                onPressed: _clearEditingMode,
-              ),
+            const SizedBox(width: 20),
           ],
         ),
       );
     }
 
-    String stepTitle = '';
-    double progress = 0.0;
-
-    switch (_currentStep) {
-      case 1:
-        stepTitle = 'SELECCIÓN DE CARTAS';
-        progress = 0.66;
-        break;
-      case 2:
-        stepTitle = 'ORGANIZADOR DE EJERCICIOS';
-        progress = 1.0;
-        break;
-    }
-
+    // Default metadata header (Step 0)
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: _prevStep,
-                child: const Icon(
-                  Icons.arrow_back_ios_rounded,
-                  color: AppColors.onSurfaceMuted,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                stepTitle,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  fontFamily: 'Inter',
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'Paso ${_currentStep + 1} de 3',
-                style: const TextStyle(
-                  color: AppColors.onSurfaceMuted,
-                  fontSize: 11,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 5,
-              backgroundColor: AppColors.border.withValues(alpha: 0.5),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: const Icon(
+              Icons.arrow_back_ios_rounded,
+              color: AppColors.onSurfaceMuted,
+              size: 20,
             ),
           ),
+          const SizedBox(width: 12),
+          Text(
+            _editingLessonId != null ? 'EDITAR LECCIÓN' : 'CREADOR LECCIÓN',
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              fontFamily: 'Inter',
+              letterSpacing: 1.0,
+            ),
+          ),
+          const Spacer(),
+          if (_editingLessonId != null)
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Nueva', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              onPressed: _clearEditingMode,
+            ),
         ],
       ),
     );
   }
 
-  // CUERPO DEL PASO ACTIVO
   Widget _buildStepBody(List<WordCardModel> userCards) {
     switch (_currentStep) {
       case 0:
         return _buildMetadataStep(userCards);
       case 1:
-        return _buildCardSelectionStep(userCards);
-      case 2:
         return _buildOrganizerStep();
       default:
         return const SizedBox();
@@ -992,329 +869,755 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
     );
   }
 
-  // PASO 1: SELECCIÓN DE CARTAS
-  Widget _buildCardSelectionStep(List<WordCardModel> userCards) {
-    if (userCards.isEmpty) {
+
+
+  // PASO 2: ORGANIZADOR DE EJERCICIOS (EDITOR DE LECCIÓN INTERACTIVO)
+  Widget _buildOrganizerStep() {
+    if (_exercises.isEmpty) {
       return Center(
-        key: const ValueKey('step1_empty'),
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.auto_awesome_motion_rounded, size: 64, color: AppColors.onSurfaceMuted),
-              const SizedBox(height: 16),
-              const Text(
-                'No tienes cartas creadas',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.onSurface),
+        key: const ValueKey('step2_empty'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.edit_note_rounded, size: 64, color: AppColors.onSurfaceMuted),
+            const SizedBox(height: 16),
+            const Text(
+              'No hay pantallas de ejercicios',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.onSurface),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Añade un ejercicio para comenzar a editar la lección.',
+              style: TextStyle(fontSize: 13, color: AppColors.onSurfaceMuted),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Para compilar una lección necesitas haber creado previamente al menos 2 cartas de vocabulario.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppColors.onSurfaceMuted),
-              ),
-            ],
-          ),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Crear Primer Ejercicio'),
+              onPressed: () => _addExerciseOfType(ExerciseType.multipleChoice),
+            ),
+          ],
         ),
       );
     }
 
+    final activeExercise = _selectedExerciseIndex < _exercises.length 
+        ? _exercises[_selectedExerciseIndex]
+        : _exercises[0];
+
     return Column(
-      key: const ValueKey('step1_list'),
+      key: const ValueKey('step2_editor'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Selecciona las cartas semilla',
-                style: TextStyle(
-                  color: AppColors.onSurface,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Elegidas: ${_selectedCardIds.length} cartas. Utilizaremos sus audios, significados y frases para tejer la lección.',
-                style: const TextStyle(color: AppColors.onSurfaceMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-            ],
+        // 1. Lista horizontal de mini pantallas de ejercicios (Boceto)
+        _buildHorizontalThumbnails(),
+
+        // 2. Simulador de Pantalla del Ejercicio (Centro del Boceto)
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: _buildMockPhoneEditor(activeExercise),
           ),
         ),
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.15,
-            ),
-            itemCount: userCards.length,
-            itemBuilder: (context, index) {
-              final card = userCards[index];
-              final isSelected = _selectedCardIds.contains(card.id);
 
-              return GestureDetector(
+        // 3. Cinta de Herramientas (Abajo del Boceto)
+        _buildToolbar(activeExercise),
+      ],
+    );
+  }
+
+  // Lista Horizontal de Miniaturas (Pantallas)
+  Widget _buildHorizontalThumbnails() {
+    return Container(
+      height: 104,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        itemCount: _exercises.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _exercises.length) {
+            return _buildAddExerciseButton();
+          }
+
+          final exercise = _exercises[index];
+          final isSelected = index == _selectedExerciseIndex;
+          
+          return _buildScreenThumbnailItem(index, exercise, isSelected);
+        },
+      ),
+    );
+  }
+
+  Widget _buildScreenThumbnailItem(int index, LessonExerciseModel exercise, bool isSelected) {
+    final typeColor = _getExerciseColor(exercise.type);
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedExerciseIndex = index;
+        });
+        HapticFeedback.lightImpact();
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 72,
+            height: 96,
+            margin: const EdgeInsets.only(right: 12, top: 4, left: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? AppColors.primary : AppColors.border.withValues(alpha: 0.6),
+                width: isSelected ? 2.5 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isSelected 
+                      ? AppColors.primary.withValues(alpha: 0.12)
+                      : Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.border.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'PÁG ${index + 1}',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.white : AppColors.onSurface,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Icon(
+                  _getExerciseIcon(exercise.type),
+                  color: isSelected ? AppColors.primary : typeColor.withValues(alpha: 0.85),
+                  size: 22,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _getShortExerciseTypeName(exercise.type),
+                  style: const TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurfaceMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_exercises.length > 1)
+            Positioned(
+              top: -2,
+              right: 6,
+              child: GestureDetector(
                 onTap: () {
+                  HapticFeedback.mediumImpact();
                   setState(() {
-                    if (isSelected) {
-                      _selectedCardIds.remove(card.id);
-                    } else {
-                      _selectedCardIds.add(card.id);
+                    _exercises.removeAt(index);
+                    if (_selectedExerciseIndex >= _exercises.length) {
+                      _selectedExerciseIndex = _exercises.length - 1;
                     }
                   });
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
+                child: Container(
+                  padding: const EdgeInsets.all(3.0),
+                  decoration: const BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.border.withValues(alpha: 0.6),
-                      width: isSelected ? 2 : 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isSelected 
-                            ? AppColors.primary.withValues(alpha: 0.1)
-                            : Colors.black.withValues(alpha: 0.005),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    size: 8,
                   ),
-                  padding: const EdgeInsets.all(12),
-                  child: Stack(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  card.category?.toUpperCase() ?? 'VOCABLO',
-                                  style: const TextStyle(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                              const Spacer(),
-                              if (card.audioUrl != null && card.audioUrl!.isNotEmpty)
-                                const Icon(Icons.volume_up_rounded, color: AppColors.primary, size: 14),
-                            ],
-                          ),
-                          const Spacer(),
-                          Text(
-                            card.word,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.onSurface,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            card.definition,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.onSurfaceMuted,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (isSelected)
-                        const Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Icon(
-                            Icons.check_circle_rounded,
-                            color: AppColors.primary,
-                            size: 18,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // PASO 2: ORGANIZADOR DE EJERCICIOS
-  Widget _buildOrganizerStep() {
-    return Column(
-      key: const ValueKey('step2'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Organizador de Ejercicios',
-                style: TextStyle(
-                  color: AppColors.onSurface,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Inter',
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Reordena, edita o borra las preguntas generadas. Ejercicios activos: ${_exercises.length}',
-                style: const TextStyle(color: AppColors.onSurfaceMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ReorderableListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            itemCount: _exercises.length,
-            onReorder: (oldIndex, newIndex) {
-              setState(() {
-                if (newIndex > oldIndex) newIndex -= 1;
-                final item = _exercises.removeAt(oldIndex);
-                _exercises.insert(newIndex, item);
-              });
-            },
-            itemBuilder: (context, index) {
-              final exercise = _exercises[index];
-              return Card(
-                key: ValueKey(exercise.id),
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-                ),
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: _getExerciseColor(exercise.type).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      _getExerciseIcon(exercise.type),
-                      color: _getExerciseColor(exercise.type),
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    exercise.question,
-                    style: const TextStyle(
-                      color: AppColors.onSurface,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Text(
-                      'R: ${exercise.correctAnswer}',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_rounded, color: AppColors.onSurfaceMuted, size: 18),
-                        onPressed: () => _showEditExerciseDialog(index),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 18),
-                        onPressed: () {
-                          setState(() {
-                            _exercises.removeAt(index);
-                          });
-                        },
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.drag_indicator_rounded, color: AppColors.border),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // BOTÓN DE NAVEGACIÓN INFERIOR
-  Widget _buildBottomNavigation(List<WordCardModel> userCards) {
-    final isLastStep = _currentStep == 2;
-
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Row(
-        children: [
-          if (_currentStep > 0)
-            Expanded(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                  side: const BorderSide(color: AppColors.border),
-                ),
-                onPressed: _prevStep,
-                child: const Text(
-                  'ATRÁS',
-                  style: TextStyle(color: AppColors.onSurface, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-          if (_currentStep > 0) const SizedBox(width: 16),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isLastStep ? AppColors.primary : const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                elevation: 0,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddExerciseButton() {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        _showAddExerciseOptionsBottomSheet();
+      },
+      child: Container(
+        width: 72,
+        height: 96,
+        margin: const EdgeInsets.only(right: 12, top: 4, bottom: 4, left: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.border,
+            width: 1.5,
+          ),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.add_circle_outline_rounded,
+              color: AppColors.primary,
+              size: 24,
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Añadir',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
               ),
-              onPressed: isLastStep ? _publishLesson : () => _nextStep(userCards),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddExerciseOptionsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'AÑADIR EJERCICIO',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                  letterSpacing: 1.0,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildAddExerciseOptionItem(
+                icon: Icons.quiz_rounded,
+                title: 'Opción Múltiple',
+                description: 'Seleccionar la respuesta correcta entre varias opciones.',
+                color: const Color(0xFF815BF5),
+                onTap: () => _addExerciseOfType(ExerciseType.multipleChoice),
+              ),
+              _buildAddExerciseOptionItem(
+                icon: Icons.volume_up_rounded,
+                title: 'Comprensión Auditiva',
+                description: 'Escuchar un audio y responder a la pregunta.',
+                color: const Color(0xFF4FA4F4),
+                onTap: () => _addExerciseOfType(ExerciseType.listeningQuiz),
+              ),
+              _buildAddExerciseOptionItem(
+                icon: Icons.sort_rounded,
+                title: 'Reconstrucción de Oración',
+                description: 'Ordenar bloques de palabras para formar la frase correcta.',
+                color: const Color(0xFFFF6B8B),
+                onTap: () => _addExerciseOfType(ExerciseType.translateSentence),
+              ),
+              _buildAddExerciseOptionItem(
+                icon: Icons.mic_rounded,
+                title: 'Pronunciación',
+                description: 'Hablar por el micrófono para validar la pronunciación.',
+                color: const Color(0xFF4CD9A3),
+                onTap: () => _addExerciseOfType(ExerciseType.mnemonicMatch),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAddExerciseOptionItem({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color, size: 20),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+      subtitle: Text(description, style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceMuted)),
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
+    );
+  }
+
+  void _addExerciseOfType(ExerciseType type) {
+    final newExercise = LessonExerciseModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: type,
+      question: type == ExerciseType.listeningQuiz 
+          ? '¿Qué significa esta palabra?'
+          : type == ExerciseType.translateSentence
+              ? 'Traduce: "I want a coffee"'
+              : 'Selecciona la traducción correcta',
+      correctAnswer: 'Coffee',
+      options: const ['Tea', 'Water', 'Coffee', 'Juice'],
+      correctSequence: type == ExerciseType.translateSentence ? const ['I', 'want', 'a', 'coffee'] : null,
+    );
+    setState(() {
+      _exercises.add(newExercise);
+      _selectedExerciseIndex = _exercises.length - 1;
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  // Simulador del Teléfono / Mock Preview Editor
+  Widget _buildMockPhoneEditor(LessonExerciseModel exercise) {
+    final typeColor = _getExerciseColor(exercise.type);
+    return Center(
+      child: Container(
+        width: 300,
+        height: 440,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: const Color(0xFF0F172A), width: 6.0), // Bisel del celular
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: Stack(
+            children: [
+              // Notch/Camara
+              Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  width: 60,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF0F172A),
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(8),
+                      bottomRight: Radius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              // Contenido Interno
+              Padding(
+                padding: const EdgeInsets.only(top: 32, left: 24, right: 24, bottom: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                     Row(
+                       mainAxisAlignment: MainAxisAlignment.center,
+                       children: [
+                         Container(
+                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                           decoration: BoxDecoration(
+                             color: typeColor.withValues(alpha: 0.12),
+                             borderRadius: BorderRadius.circular(8),
+                           ),
+                           child: Text(
+                             _getExerciseTypeName(exercise.type).toUpperCase(),
+                             style: TextStyle(
+                               fontSize: 7.5,
+                               fontWeight: FontWeight.bold,
+                               color: typeColor,
+                               letterSpacing: 0.5,
+                             ),
+                           ),
+                         ),
+                       ],
+                     ),
+                     const SizedBox(height: 12),
+                     // Editor de Instrucción/Pregunta "in-place"
+                     TextFormField(
+                       key: ValueKey('question-$_selectedExerciseIndex-${exercise.id}'),
+                       initialValue: exercise.question,
+                       textAlign: TextAlign.center,
+                       maxLines: 2,
+                       style: const TextStyle(
+                         color: AppColors.onSurface,
+                         fontSize: 13,
+                         fontWeight: FontWeight.bold,
+                         fontFamily: 'Inter',
+                       ),
+                       decoration: InputDecoration(
+                         hintText: 'Instrucción del ejercicio...',
+                         hintStyle: TextStyle(color: AppColors.onSurfaceMuted.withValues(alpha: 0.5)),
+                         border: InputBorder.none,
+                         isDense: true,
+                         contentPadding: EdgeInsets.zero,
+                       ),
+                       onChanged: (val) {
+                         _updateExercise(exercise.copyWith(question: val.trim()));
+                       },
+                     ),
+                     const SizedBox(height: 12),
+                     // Contenido interactivo según tipo
+                     Expanded(
+                       child: SingleChildScrollView(
+                         child: _buildExerciseInteractiveBody(exercise),
+                       ),
+                     ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExerciseInteractiveBody(LessonExerciseModel exercise) {
+    switch (exercise.type) {
+      case ExerciseType.listeningQuiz:
+      case ExerciseType.multipleChoice:
+        return _buildOptionsInteractiveEditor(exercise);
+      case ExerciseType.translateSentence:
+        return _buildTranslateInteractiveEditor(exercise);
+      case ExerciseType.mnemonicMatch:
+        return _buildMnemonicInteractiveEditor(exercise);
+    }
+  }
+
+  Widget _buildOptionsInteractiveEditor(LessonExerciseModel exercise) {
+    final typeColor = _getExerciseColor(exercise.type);
+    return Column(
+      children: [
+        if (exercise.type == ExerciseType.listeningQuiz) ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: typeColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.volume_up_rounded, color: typeColor, size: 24),
+          ),
+        ],
+        ...List.generate(exercise.options.length, (optIndex) {
+          final optionText = exercise.options[optIndex];
+          final isCorrect = optionText == exercise.correctAnswer;
+          
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: isCorrect ? const Color(0xFFDCFCE7) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isCorrect ? const Color(0xFF22C55E) : AppColors.border.withValues(alpha: 0.6),
+                width: isCorrect ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _updateExercise(exercise.copyWith(correctAnswer: optionText));
+                  },
+                  child: Icon(
+                    isCorrect ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
+                    color: isCorrect ? const Color(0xFF22C55E) : AppColors.onSurfaceMuted,
+                    size: 14,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('opt-$_selectedExerciseIndex-$optIndex-${exercise.id}'),
+                    initialValue: optionText,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: isCorrect ? FontWeight.bold : FontWeight.normal,
+                      color: isCorrect ? const Color(0xFF15803D) : AppColors.onSurface,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    onChanged: (val) {
+                      final updatedOptions = List<String>.from(exercise.options);
+                      updatedOptions[optIndex] = val.trim();
+                      final String newCorrectAnswer = isCorrect ? val.trim() : exercise.correctAnswer;
+                      
+                      _updateExercise(exercise.copyWith(
+                        options: updatedOptions,
+                        correctAnswer: newCorrectAnswer,
+                      ));
+                    },
+                  ),
+                ),
+                if (exercise.options.length > 2)
+                  GestureDetector(
+                    onTap: () {
+                      final updatedOptions = List<String>.from(exercise.options);
+                      updatedOptions.removeAt(optIndex);
+                      String newCorrectAnswer = exercise.correctAnswer;
+                      if (isCorrect) {
+                        newCorrectAnswer = updatedOptions[0];
+                      }
+                      _updateExercise(exercise.copyWith(
+                        options: updatedOptions,
+                        correctAnswer: newCorrectAnswer,
+                      ));
+                    },
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppColors.error,
+                      size: 14,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildTranslateInteractiveEditor(LessonExerciseModel exercise) {
+    final words = exercise.correctSequence ?? exercise.correctAnswer.split(' ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'ORACIÓN CORRECTA:',
+          style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: TextFormField(
+            key: ValueKey('translate-ans-$_selectedExerciseIndex-${exercise.id}'),
+            initialValue: exercise.correctAnswer,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+            maxLines: 2,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (val) {
+              final newWords = val.trim().split(' ').where((w) => w.isNotEmpty).toList();
+              _updateExercise(exercise.copyWith(
+                correctAnswer: val.trim(),
+                correctSequence: newWords,
+                options: newWords,
+              ));
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'BLOQUES DE PALABRAS:',
+          style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: words.map((word) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
               child: Text(
-                isLastStep 
-                    ? 'PUBLICAR LECCIÓN' 
-                    : _currentStep == 1 
-                        ? 'COMPILAR EJERCICIOS' 
-                        : 'SIGUIENTE',
-                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                word,
+                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMnemonicInteractiveEditor(LessonExerciseModel exercise) {
+    final typeColor = _getExerciseColor(exercise.type);
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: typeColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.mic_rounded, color: typeColor, size: 30),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'TEXTO A PRONUNCIAR:',
+          style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.onSurfaceMuted),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: TextFormField(
+            key: ValueKey('mnemonic-ans-$_selectedExerciseIndex-${exercise.id}'),
+            initialValue: exercise.correctAnswer,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (val) {
+              _updateExercise(exercise.copyWith(correctAnswer: val.trim()));
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _updateExercise(LessonExerciseModel newExercise) {
+    setState(() {
+      _exercises[_selectedExerciseIndex] = newExercise;
+    });
+  }
+
+  // Cinta de Herramientas / Toolbar
+  Widget _buildToolbar(LessonExerciseModel exercise) {
+    return Container(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 10,
+        bottom: MediaQuery.of(context).padding.bottom > 0
+            ? MediaQuery.of(context).padding.bottom + 10
+            : 14,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: AppColors.border.withValues(alpha: 0.8), width: 1.0),
+        ),
+      ),
+      child: Row(
+        children: [
+          _buildToolbarButton(
+            icon: Icons.swap_horiz_rounded,
+            label: 'Tipo',
+            onTap: () => _showChangeTypeMenu(exercise),
+          ),
+          const SizedBox(width: 24),
+          _buildToolbarButton(
+            icon: Icons.copy_rounded,
+            label: 'Clonar',
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              final duplicated = LessonExerciseModel(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                type: exercise.type,
+                question: exercise.question,
+                correctAnswer: exercise.correctAnswer,
+                options: List<String>.from(exercise.options),
+                correctSequence: exercise.correctSequence != null
+                    ? List<String>.from(exercise.correctSequence!)
+                    : null,
+                audioUrl: exercise.audioUrl,
+              );
+              setState(() {
+                _exercises.insert(_selectedExerciseIndex + 1, duplicated);
+                _selectedExerciseIndex += 1;
+              });
+            },
+          ),
+          const SizedBox(width: 24),
+          if (exercise.type == ExerciseType.multipleChoice || exercise.type == ExerciseType.listeningQuiz)
+            _buildToolbarButton(
+              icon: Icons.add_box_outlined,
+              label: 'Opción',
+              onTap: () {
+                if (exercise.options.length >= 6) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Máximo de 6 opciones alcanzado.')),
+                  );
+                  return;
+                }
+                HapticFeedback.lightImpact();
+                final updatedOptions = List<String>.from(exercise.options);
+                updatedOptions.add('Nueva Opción ${updatedOptions.length + 1}');
+                _updateExercise(exercise.copyWith(options: updatedOptions));
+              },
+            ),
+          const Spacer(),
+          GestureDetector(
+            onTap: _publishLesson,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF0F172A),
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                color: Colors.white,
+                size: 26,
               ),
             ),
           ),
@@ -1322,6 +1625,84 @@ class _CreateLessonWizardScreenState extends ConsumerState<CreateLessonWizardScr
       ),
     );
   }
+
+  Widget _buildToolbarButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+  }) {
+    final bool isDisabled = onTap == null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isDisabled ? Colors.grey.shade300 : Colors.grey.shade700,
+              size: 22,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: isDisabled ? Colors.grey.shade300 : Colors.grey.shade600,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showChangeTypeMenu(LessonExerciseModel exercise) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return SimpleDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Cambiar tipo de ejercicio', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          children: ExerciseType.values.map((type) {
+            return SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateExercise(exercise.copyWith(type: type));
+                HapticFeedback.mediumImpact();
+              },
+              child: Row(
+                children: [
+                  Icon(_getExerciseIcon(type), color: _getExerciseColor(type), size: 16),
+                  const SizedBox(width: 12),
+                  Text(_getExerciseTypeName(type), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  String _getShortExerciseTypeName(ExerciseType type) {
+    switch (type) {
+      case ExerciseType.listeningQuiz:
+        return 'Audio';
+      case ExerciseType.translateSentence:
+        return 'Oración';
+      case ExerciseType.multipleChoice:
+        return 'Quiz';
+      case ExerciseType.mnemonicMatch:
+        return 'Micro';
+    }
+  }
+
+
 
   // HELPERS
   String _getExerciseTypeName(ExerciseType type) {
