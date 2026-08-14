@@ -224,13 +224,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                             return LayoutBuilder(
                               builder: (context, constraints) {
                                 final width = constraints.maxWidth;
-                                const double rowHeight = 150.0;
+                                const double rowHeight = 200.0;
                                 const double nodeSize = 80.0;
                                 const double cardHeight = 92.0;
                                 final totalHeight = mockLessons.length * rowHeight + 40.0;
 
                                 // Fracciones de alineación X para el caminito ondulado
-                                final xFractions = [0.25, 0.65, 0.35, 0.70, 0.40, 0.65];
+                                final xFractions = [0.50, 0.65, 0.35, 0.70, 0.40, 0.65];
 
                                 return SingleChildScrollView(
                                   controller: scrollController,
@@ -257,18 +257,82 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                         child: Stack(
                                           children: [
                                             for (int index = 0; index < mockLessons.length; index++) ...[
-                                              // Tarjeta informativa de la lección
-                                              Positioned(
-                                                top: (index * rowHeight + rowHeight / 2) - cardHeight / 2,
-                                                left: (xFractions[index % xFractions.length] < 0.5)
-                                                    ? (width * xFractions[index % xFractions.length]) + nodeSize / 2 + 10
-                                                    : 20,
-                                                right: (xFractions[index % xFractions.length] < 0.5)
-                                                    ? 20
-                                                    : (width - (width * xFractions[index % xFractions.length])) + nodeSize / 2 + 10,
-                                                child: _buildLessonCard(context, mockLessons[index], (xFractions[index % xFractions.length] < 0.5), cardHeight),
+                                              // 1. Info de la lección (Categoría + Título) arriba del nodo
+                                              Builder(
+                                                builder: (context) {
+                                                  final lesson = mockLessons[index];
+                                                  final double centerX = width * xFractions[index % xFractions.length];
+                                                  const double boxWidth = 190.0;
+                                                  final double boxLeft = (centerX - boxWidth / 2).clamp(12.0, width - boxWidth - 12.0);
+                                                  final double nodeCenterY = index * rowHeight + rowHeight / 2;
+
+                                                  return Positioned(
+                                                    left: boxLeft,
+                                                    width: boxWidth,
+                                                    top: nodeCenterY - nodeSize / 2 - 46.0,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: lesson.isLocked
+                                                            ? Colors.white.withOpacity(0.75)
+                                                            : Colors.white.withOpacity(0.95),
+                                                        borderRadius: BorderRadius.circular(16),
+                                                        border: Border.all(
+                                                          color: lesson.isLocked
+                                                              ? Colors.grey.shade300
+                                                              : lesson.gradient[0].withOpacity(0.35),
+                                                          width: 1.0,
+                                                        ),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black.withOpacity(0.04),
+                                                            blurRadius: 4,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: Column(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Row(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Text(lesson.flag, style: const TextStyle(fontSize: 10)),
+                                                              const SizedBox(width: 4),
+                                                              Text(
+                                                                lesson.category.toUpperCase(),
+                                                                style: TextStyle(
+                                                                  color: lesson.isLocked
+                                                                      ? Colors.grey.shade600
+                                                                      : lesson.gradient[0],
+                                                                  fontSize: 7.5,
+                                                                  fontWeight: FontWeight.bold,
+                                                                  letterSpacing: 0.5,
+                                                                  fontFamily: 'Inter',
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            lesson.title,
+                                                            textAlign: TextAlign.center,
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            style: TextStyle(
+                                                              color: lesson.isLocked ? Colors.grey.shade600 : AppColors.onSurface,
+                                                              fontSize: 12.0,
+                                                              fontWeight: FontWeight.bold,
+                                                              fontFamily: 'Inter',
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
                                               ),
-                                              // Nodo interactivo de la lección
+                                              // 2. Nodo interactivo de la lección
                                               Positioned(
                                                 left: (width * xFractions[index % xFractions.length]) - nodeSize / 2,
                                                 top: (index * rowHeight + rowHeight / 2) - nodeSize / 2,
@@ -277,6 +341,54 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                                   size: nodeSize,
                                                   onTap: () => _showLessonDetailsBottomSheet(context, mockLessons[index]),
                                                 ),
+                                              ),
+                                              // 3. Comentarios abajo del nodo
+                                              Builder(
+                                                builder: (context) {
+                                                  final lesson = mockLessons[index];
+                                                  final double centerX = width * xFractions[index % xFractions.length];
+                                                  const double boxWidth = 220.0;
+                                                  final double boxLeft = (centerX - boxWidth / 2).clamp(12.0, width - boxWidth - 12.0);
+                                                  final double nodeCenterY = index * rowHeight + rowHeight / 2;
+
+                                                  return Positioned(
+                                                    left: boxLeft,
+                                                    width: boxWidth,
+                                                    top: nodeCenterY + nodeSize / 2 + 8.0,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: lesson.isLocked
+                                                            ? Colors.white.withOpacity(0.75)
+                                                            : Colors.white.withOpacity(0.95),
+                                                        borderRadius: BorderRadius.circular(16),
+                                                        border: Border.all(
+                                                          color: lesson.isLocked
+                                                              ? Colors.grey.shade300
+                                                              : AppColors.border.withOpacity(0.5),
+                                                          width: 1.0,
+                                                        ),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black.withOpacity(0.04),
+                                                            blurRadius: 4,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: EchoCommentsWidget(
+                                                        comments: lesson.isLocked
+                                                            ? const [
+                                                                LessonComment(
+                                                                  text: "Opiniones bloqueadas 🔒",
+                                                                  userName: "Sistema",
+                                                                ),
+                                                              ]
+                                                            : lesson.comments,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
                                               ),
                                             ]
                                           ],
@@ -366,106 +478,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
 // WIDGETS Y PINTORES DE SOPORTE PARA LECCIONES
 // ==========================================
 
-Widget _buildLessonCard(BuildContext context, Lesson lesson, bool isLeft, double cardHeight) {
-  final isLocked = lesson.isLocked;
-  return Container(
-    height: cardHeight,
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-    decoration: BoxDecoration(
-      color: isLocked
-          ? Colors.white.withOpacity(0.5)
-          : Colors.white.withOpacity(0.85),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(
-        color: isLocked
-            ? AppColors.border.withOpacity(0.4)
-            : AppColors.border.withOpacity(0.8),
-        width: 1,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.015),
-          blurRadius: 6,
-          offset: const Offset(0, 3),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              lesson.flag,
-              style: const TextStyle(fontSize: 12),
-            ),
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-              decoration: BoxDecoration(
-                color: isLocked
-                    ? Colors.grey.shade200
-                    : lesson.gradient[0].withOpacity(0.12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                lesson.category.toUpperCase(),
-                style: TextStyle(
-                  color: isLocked ? Colors.grey.shade600 : lesson.gradient[0],
-                  fontSize: 8,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          lesson.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: isLocked ? Colors.grey.shade600 : AppColors.onSurface,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Inter',
-          ),
-        ),
-        const SizedBox(height: 3),
-        Row(
-          children: [
-            Expanded(
-              child: EchoCommentsWidget(
-                comments: isLocked
-                    ? const [
-                        LessonComment(
-                          text: "Opiniones bloqueadas 🔒",
-                          userName: "Sistema",
-                        ),
-                      ]
-                    : lesson.comments,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 3),
-        Text(
-          'Por ${lesson.creatorName}',
-          style: TextStyle(
-            color: isLocked ? Colors.grey.shade500 : AppColors.onSurfaceMuted,
-            fontSize: 9.5,
-            fontWeight: FontWeight.w500,
-            fontFamily: 'Inter',
-          ),
-        ),
-      ],
-    ),
-  );
-}
+
 
 class EchoCommentsWidget extends StatefulWidget {
   final List<LessonComment> comments;
@@ -533,7 +546,7 @@ class _EchoCommentsWidgetState extends State<EchoCommentsWidget> {
       },
       layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
         return Stack(
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.center,
           children: <Widget>[
             ...previousChildren,
             if (currentChild != null) currentChild,
@@ -592,6 +605,7 @@ class _EchoCommentsWidgetState extends State<EchoCommentsWidget> {
     return Row(
       key: ValueKey<int>(index),
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         avatarWidget,
         const SizedBox(width: 5),
