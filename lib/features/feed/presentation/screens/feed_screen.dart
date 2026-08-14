@@ -224,13 +224,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                             return LayoutBuilder(
                               builder: (context, constraints) {
                                 final width = constraints.maxWidth;
-                                const double rowHeight = 200.0;
+                                const double rowHeight = 170.0;
                                 const double nodeSize = 80.0;
                                 const double cardHeight = 92.0;
                                 final totalHeight = mockLessons.length * rowHeight + 40.0;
 
                                 // Fracciones de alineación X para el caminito ondulado
-                                final xFractions = [0.50, 0.65, 0.35, 0.70, 0.40, 0.65];
+                                final xFractions = [0.42, 0.65, 0.35, 0.70, 0.40, 0.65];
 
                                 return SingleChildScrollView(
                                   controller: scrollController,
@@ -342,19 +342,27 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                                   onTap: () => _showLessonDetailsBottomSheet(context, mockLessons[index]),
                                                 ),
                                               ),
-                                              // 3. Comentarios abajo del nodo
+                                              // 3. Comentarios al costado del nodo
                                               Builder(
                                                 builder: (context) {
                                                   final lesson = mockLessons[index];
-                                                  final double centerX = width * xFractions[index % xFractions.length];
-                                                  const double boxWidth = 220.0;
-                                                  final double boxLeft = (centerX - boxWidth / 2).clamp(12.0, width - boxWidth - 12.0);
+                                                  final double xFraction = xFractions[index % xFractions.length];
+                                                  final double centerX = width * xFraction;
                                                   final double nodeCenterY = index * rowHeight + rowHeight / 2;
+                                                  const double boxWidth = 175.0;
+
+                                                  // Si xFraction <= 0.5, el nodo está a la izquierda/centro, el comentario va a la DERECHA.
+                                                  // Si xFraction > 0.5, el nodo está a la derecha, el comentario va a la IZQUIERDA.
+                                                  final bool placeOnRight = xFraction <= 0.5;
+
+                                                  final double boxLeft = placeOnRight
+                                                      ? (centerX + nodeSize / 2 + 8.0).clamp(12.0, width - boxWidth - 12.0)
+                                                      : (centerX - nodeSize / 2 - 8.0 - boxWidth).clamp(12.0, width - boxWidth - 12.0);
 
                                                   return Positioned(
                                                     left: boxLeft,
                                                     width: boxWidth,
-                                                    top: nodeCenterY + nodeSize / 2 + 8.0,
+                                                    top: nodeCenterY - 18.0, // Centrado verticalmente al costado del nodo
                                                     child: Container(
                                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                                       decoration: BoxDecoration(

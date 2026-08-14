@@ -266,3 +266,56 @@ Si en el futuro se desea regresar al diseño de tarjeta lateral tradicional o el
      ),
    ]
    ```
+
+---
+
+## 5. Variantes de Posición del Globo de Comentarios (Debajo vs. Al Costado)
+
+Para adaptar el diseño a diferentes requerimientos estéticos, se definieron dos variantes de distribución del globo del comentario eco en la hoja de ruta.
+
+### Variante A: Globo debajo del Nodo (Layout Vertical Puro)
+
+* **Descripción:** Los comentarios se sitúan de manera centrada directamente debajo de cada botón circular, alineándose horizontalmente en el mismo eje que el título (que está arriba).
+* **Parámetros de Spacing:**
+  * `rowHeight = 200.0` (Requerido para dar suficiente holgura vertical y evitar que la cápsula inferior colisione con el título de la lección siguiente).
+  * `xFractions = [0.50, 0.65, 0.35, 0.70, 0.40, 0.65]` (La primera lección inicia en `0.50`, perfectamente centrada).
+* **Código de Posicionamiento:**
+  ```dart
+  Positioned(
+    left: (centerX - boxWidth / 2).clamp(12.0, width - boxWidth - 12.0),
+    width: 220.0,
+    top: nodeCenterY + nodeSize / 2 + 8.0, // Posicionamiento vertical inferior
+    child: Container(
+      // Decoración y contenido de opiniones eco
+    ),
+  )
+  ```
+
+### Variante B: Globo al Costado del Nodo (Layout Lateral Inteligente)
+
+* **Descripción:** Los comentarios se sitúan al costado del botón circular (derecha o izquierda según el espacio disponible en pantalla), liberando espacio vertical.
+* **Parámetros de Spacing:**
+  * `rowHeight = 170.0` (El caminito es más compacto y dinámico ya que no hay elementos colgando debajo de los botones).
+  * `xFractions = [0.42, 0.65, 0.35, 0.70, 0.40, 0.65]` (Se desplaza el primer nodo a `0.42` para dar espacio en el borde derecho para la cápsula de opiniones).
+* **Código de Posicionamiento:**
+  ```dart
+  Builder(
+    builder: (context) {
+      const double boxWidth = 175.0;
+      final bool placeOnRight = xFraction <= 0.5;
+
+      final double boxLeft = placeOnRight
+          ? (centerX + nodeSize / 2 + 8.0).clamp(12.0, width - boxWidth - 12.0)
+          : (centerX - nodeSize / 2 - 8.0 - boxWidth).clamp(12.0, width - boxWidth - 12.0);
+
+      return Positioned(
+        left: boxLeft,
+        width: boxWidth,
+        top: nodeCenterY - 18.0, // Centrado verticalmente al costado del botón
+        child: Container(
+          // Decoración y contenido de opiniones eco
+        ),
+      );
+    },
+  )
+  ```
