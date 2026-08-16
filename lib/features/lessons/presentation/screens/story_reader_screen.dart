@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/audio_service.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
-import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 import '../../../chat/presentation/screens/chat_detail_screen.dart';
 import '../../domain/models/story_model.dart';
 import '../widgets/story_background_widget.dart';
@@ -316,14 +316,16 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
       selectedWordCard = matches.first;
     }
 
+    if (selectedWordCard == null) return;
+
     ref.read(audioServiceProvider).playTap();
     HapticFeedback.lightImpact();
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    const cardWidth = 96.0;
-    const cardHeight = 136.0;
+    const cardWidth = 280.0;
+    const cardHeight = 140.0;
 
     double left = wordCenter.dx - (cardWidth / 2);
     left = left.clamp(16.0, screenWidth - cardWidth - 16.0);
@@ -337,33 +339,6 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
     }
 
     final arrowLeft = (wordCenter.dx - left).clamp(16.0, cardWidth - 16.0);
-    final cardController = FlippableCardController();
-
-    void navigateToDetail() {
-      _dismissOverlay();
-      Navigator.push(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => WordDetailScreen(
-            selectedWord: cleanWord,
-            cardId: selectedWordCard?.id,
-            conversationId: null,
-          ),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                ),
-                child: child,
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 280),
-        ),
-      );
-    }
 
     _overlayEntry = OverlayEntry(
       builder: (_) => OverlayEntrance(
@@ -372,30 +347,16 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
         isBelow: isBelow,
         onDismiss: _dismissOverlay,
         onShare: () {},
-        onHorizontalDragEnd: (details) {
-          if (details.primaryVelocity != null && details.primaryVelocity!.abs() > 200) {
-            final swipeRight = details.primaryVelocity! > 0;
-            cardController.flip(swipeRight: swipeRight);
-            HapticFeedback.selectionClick();
-          }
-        },
         child: SizedBox(
           width: cardWidth,
           height: cardHeight + 8.0,
-          child: FlippableCard(
-            controller: cardController,
+          child: StoryExercisePopup(
+            card: selectedWordCard!,
+            allCards: wordList,
             isBelow: isBelow,
             arrowLeft: arrowLeft,
-            front: WordMiniCardFront(
-              word: cleanWord,
-              card: selectedWordCard,
-              onTap: navigateToDetail,
-            ),
-            back: WordMiniCardBack(
-              word: cleanWord,
-              card: selectedWordCard,
-              onTap: navigateToDetail,
-            ),
+            onDismiss: _dismissOverlay,
+            audioService: ref.read(audioServiceProvider),
           ),
         ),
       ),
@@ -797,6 +758,623 @@ class _StoryWordWidgetState extends State<_StoryWordWidget> {
         child: Text(
           widget.token.text,
           style: widget.textStyle,
+        ),
+      ),
+    );
+  }
+}
+
+class StoryExercisePopup extends StatefulWidget {
+  final WordCardModel card;
+  final List<WordCardModel> allCards;
+  final bool isBelow;
+  final double arrowLeft;
+  final VoidCallback onDismiss;
+  final AudioService audioService;
+
+  const StoryExercisePopup({
+    super.key,
+    required this.card,
+    required this.allCards,
+    required this.isBelow,
+    required this.arrowLeft,
+    required this.onDismiss,
+    required this.audioService,
+  });
+
+  @override
+  State<StoryExercisePopup> createState() => _StoryExercisePopupState();
+}
+
+class _StoryExercisePopupState extends State<StoryExercisePopup> {
+  String _quizType = 'pregunta';
+  String _quizAnswer = 'Sí';
+  String _quizHiddenWord = '';
+  String _exampleSentence = '';
+
+  List<String> _wordPool = [];
+  List<String> _assembledWords = [];
+  List<String> _shuffledOptions = [];
+
+  String? _selectedOption; // para completar
+  int? _selectedIndex; // para pregunta/sí-no
+  bool _isAnswered = false;
+  bool _isCorrect = false;
+
+  final AudioPlayer _localAudioPlayer = AudioPlayer();
+  bool _isPlayingAudio = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeQuiz();
+  }
+
+  void _initializeQuiz() {
+    final design = widget.card.canvasDesign;
+    if (design == null || design['quiz_type'] == null) {
+      // Fallback si no tiene quiz configurado
+      _quizType = 'pregunta';
+      _exampleSentence = '¿"${widget.card.word}" significa "${widget.card.definition}"?';
+      _quizAnswer = 'Sí';
+    } else {
+      _quizType = design['quiz_type'] as String? ?? 'pregunta';
+      _quizAnswer = design['quiz_answer'] as String? ?? 'Sí';
+      _quizHiddenWord = design['quiz_hidden_word'] as String? ?? '';
+      _exampleSentence = widget.card.exampleSentence ?? '';
+    }
+
+    if (_quizType == 'acomodar') {
+      final cleanSentence = _exampleSentence
+          .replaceAll(RegExp(r'[.,\/#!$%\^&\*;:{}=\-_`~()?¿¡]'), '');
+      final words = cleanSentence
+          .split(RegExp(r'\s+'))
+          .map((w) => w.trim())
+          .where((w) => w.isNotEmpty)
+          .toList();
+
+      final List<dynamic> distractorsRaw = design?['quiz_distractors'] as List<dynamic>? ?? [];
+      final distractors = distractorsRaw.map((e) => e.toString()).toList();
+
+      _wordPool = [...words, ...distractors]
+          .where((w) => w.isNotEmpty)
+          .toList()..shuffle();
+      _assembledWords = [];
+    } else if (_quizType == 'completar') {
+      final List<dynamic> distractorsRaw = design?['quiz_distractors'] as List<dynamic>? ?? [];
+      final distractors = distractorsRaw.map((e) => e.toString()).toList();
+      _shuffledOptions = [_quizHiddenWord, ...distractors]
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList()..shuffle();
+      _selectedOption = null;
+    }
+    _selectedIndex = null;
+    _isAnswered = false;
+    _isCorrect = false;
+  }
+
+  Future<void> _playExampleAudio() async {
+    if (_isPlayingAudio) {
+      await _localAudioPlayer.stop();
+      setState(() {
+        _isPlayingAudio = false;
+      });
+      return;
+    }
+
+    final url = widget.card.audioUrl;
+    if (url != null && url.isNotEmpty) {
+      try {
+        setState(() {
+          _isPlayingAudio = true;
+        });
+        await _localAudioPlayer.play(UrlSource(url));
+        _localAudioPlayer.onPlayerComplete.first.then((_) {
+          if (mounted) {
+            setState(() {
+              _isPlayingAudio = false;
+            });
+          }
+        });
+      } catch (e) {
+        debugPrint('Error playing card audio: $e');
+        if (mounted) {
+          setState(() {
+            _isPlayingAudio = false;
+          });
+        }
+      }
+    } else {
+      final tts = FlutterTts();
+      await tts.setLanguage(widget.card.language ?? 'en-US');
+      await tts.speak(_exampleSentence);
+    }
+  }
+
+  String _getCompletarText(String originalText, String hiddenWord) {
+    if (originalText.isEmpty || hiddenWord.isEmpty) return originalText;
+    final regExp = RegExp(RegExp.escape(hiddenWord), caseSensitive: false);
+    return originalText.replaceAll(regExp, '_____');
+  }
+
+  bool _checkAcomodarCorrect() {
+    final cleanSentence = _exampleSentence;
+    final expectedWords = cleanSentence
+        .replaceAll(RegExp(r'[.,\/#!$%\^&\*;:{}=\-_`~()?¿¡]'), '')
+        .split(RegExp(r'\s+'))
+        .map((w) => w.trim())
+        .where((w) => w.isNotEmpty)
+        .toList();
+
+    if (_assembledWords.length != expectedWords.length) return false;
+    for (int i = 0; i < expectedWords.length; i++) {
+      if (_assembledWords[i].toLowerCase() != expectedWords[i].toLowerCase()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _checkAcomodarState() {
+    final cleanSentence = _exampleSentence;
+    final expectedWords = cleanSentence
+        .replaceAll(RegExp(r'[.,\/#!$%\^&\*;:{}=\-_`~()?¿¡]'), '')
+        .split(RegExp(r'\s+'))
+        .map((w) => w.trim())
+        .where((w) => w.isNotEmpty)
+        .toList();
+
+    if (_assembledWords.length == expectedWords.length) {
+      final correct = _checkAcomodarCorrect();
+      setState(() {
+        _isAnswered = true;
+        _isCorrect = correct;
+      });
+
+      if (correct) {
+        widget.audioService.playFlip(); // Exito
+        HapticFeedback.heavyImpact();
+        Future.delayed(const Duration(milliseconds: 1600), () {
+          if (mounted) {
+            widget.onDismiss();
+          }
+        });
+      } else {
+        widget.audioService.playTap(); // Fallo
+        HapticFeedback.vibrate();
+        Future.delayed(const Duration(milliseconds: 1600), () {
+          if (mounted) {
+            setState(() {
+              _initializeQuiz();
+            });
+          }
+        });
+      }
+    }
+  }
+
+  void _onOptionSelected(bool isCorrect) {
+    if (isCorrect) {
+      widget.audioService.playFlip();
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 1600), () {
+        if (mounted) {
+          widget.onDismiss();
+        }
+      });
+    } else {
+      widget.audioService.playTap();
+      HapticFeedback.vibrate();
+      Future.delayed(const Duration(milliseconds: 1600), () {
+        if (mounted) {
+          setState(() {
+            _initializeQuiz();
+          });
+        }
+      });
+    }
+  }
+
+  void _onPreguntaSelected(int index) {
+    if (_isAnswered) return;
+    
+    final isCorrect = (index == 0 && _quizAnswer == 'Sí') || (index == 1 && _quizAnswer == 'No');
+    setState(() {
+      _selectedIndex = index;
+      _isAnswered = true;
+      _isCorrect = isCorrect;
+    });
+
+    _onOptionSelected(isCorrect);
+  }
+
+  @override
+  void dispose() {
+    _localAudioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget rightColumnContent;
+    if (_quizType == 'acomodar') {
+      rightColumnContent = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Ordena la frase:',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              GestureDetector(
+                onTap: _playExampleAudio,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isPlayingAudio ? Icons.stop_rounded : Icons.volume_up_rounded,
+                    size: 16,
+                    color: const Color(0xFF7C3AED),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Container(
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: _isAnswered
+                  ? (_isCorrect ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2))
+                  : const Color(0xFFF8FAFC),
+              border: Border.all(
+                color: _isAnswered
+                    ? (_isCorrect ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5))
+                    : const Color(0xFFE2E8F0),
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: _assembledWords.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Toca abajo para ordenar',
+                      style: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 9,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _assembledWords.map((word) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                          child: GestureDetector(
+                            onTap: () {
+                              if (_isAnswered) return;
+                              setState(() {
+                                _assembledWords.remove(word);
+                                _wordPool.add(word);
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                word,
+                                style: const TextStyle(fontSize: 9, color: Color(0xFF1E293B)),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                alignment: WrapAlignment.center,
+                children: _wordPool.map((word) {
+                  return GestureDetector(
+                    onTap: () {
+                      if (_isAnswered) return;
+                      setState(() {
+                        _wordPool.remove(word);
+                        _assembledWords.add(word);
+                      });
+                      _checkAcomodarState();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        word,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (_quizType == 'completar') {
+      rightColumnContent = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Center(
+              child: Text(
+                _getCompletarText(_exampleSentence, _quizHiddenWord),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            alignment: WrapAlignment.center,
+            children: List.generate(_shuffledOptions.length, (index) {
+              final optionText = _shuffledOptions[index];
+              final isSelected = _selectedOption == optionText;
+              final isCorrect = optionText.toLowerCase() == _quizHiddenWord.toLowerCase();
+
+              Color buttonBg = const Color(0xFFF1F5F9);
+              Color textCol = const Color(0xFF334155);
+              Color borderCol = const Color(0xFFE2E8F0);
+
+              if (_isAnswered) {
+                if (isCorrect) {
+                  buttonBg = const Color(0xFFDCFCE7);
+                  textCol = const Color(0xFF15803D);
+                  borderCol = const Color(0xFF86EFAC);
+                } else if (isSelected) {
+                  buttonBg = const Color(0xFFFEE2E2);
+                  textCol = const Color(0xFFB91C1C);
+                  borderCol = const Color(0xFFFCA5A5);
+                }
+              }
+
+              return GestureDetector(
+                onTap: () {
+                  if (_isAnswered) return;
+                  setState(() {
+                    _selectedOption = optionText;
+                    _isAnswered = true;
+                    _isCorrect = isCorrect;
+                  });
+                  _onOptionSelected(isCorrect);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: buttonBg,
+                    border: Border.all(color: borderCol, width: 1.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    optionText,
+                    style: TextStyle(
+                      color: textCol,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      );
+    } else {
+      // 'pregunta'
+      rightColumnContent = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Center(
+              child: Text(
+                _exampleSentence,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: List.generate(2, (index) {
+              final optionText = index == 0 ? 'Sí' : 'No';
+              final isSelected = _selectedIndex == index;
+              final isCorrect = (index == 0 && _quizAnswer == 'Sí') || (index == 1 && _quizAnswer == 'No');
+
+              Color buttonBg = const Color(0xFFF1F5F9);
+              Color textCol = const Color(0xFF334155);
+              Color borderCol = const Color(0xFFE2E8F0);
+
+              if (_isAnswered) {
+                if (isCorrect) {
+                  buttonBg = const Color(0xFFDCFCE7);
+                  textCol = const Color(0xFF15803D);
+                  borderCol = const Color(0xFF86EFAC);
+                } else if (isSelected) {
+                  buttonBg = const Color(0xFFFEE2E2);
+                  textCol = const Color(0xFFB91C1C);
+                  borderCol = const Color(0xFFFCA5A5);
+                }
+              }
+
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: index == 0 ? 0 : 4.0,
+                    right: index == 1 ? 0 : 4.0,
+                  ),
+                  child: GestureDetector(
+                    onTap: () => _onPreguntaSelected(index),
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: buttonBg,
+                        border: Border.all(color: borderCol, width: 1.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child: Text(
+                          optionText,
+                          style: TextStyle(
+                            color: textCol,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.isBelow)
+          Padding(
+            padding: EdgeInsets.only(left: widget.arrowLeft - 6.0),
+            child: CustomPaint(
+              size: const Size(12, 8),
+              painter: ArrowPainter(
+                color: const Color(0xFF7C3AED),
+                isBelow: true,
+              ),
+            ),
+          ),
+        Container(
+          width: 280,
+          height: 140,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF7C3AED), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Lado Izquierdo: Imagen de la carta
+              Container(
+                width: 90,
+                height: 140,
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                  ),
+                  child: widget.card.imageUrl.isNotEmpty
+                      ? Image.network(
+                          widget.card.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+                        )
+                      : _buildPlaceholder(),
+                ),
+              ),
+              // Lado Derecho: Contenido del Ejercicio
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: rightColumnContent,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!widget.isBelow)
+          Padding(
+            padding: EdgeInsets.only(left: widget.arrowLeft - 6.0),
+            child: CustomPaint(
+              size: const Size(12, 8),
+              painter: ArrowPainter(
+                color: const Color(0xFF7C3AED),
+                isBelow: false,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      color: const Color(0xFFF1F5F9),
+      child: const Center(
+        child: Icon(
+          Icons.book_rounded,
+          color: Color(0xFF94A3B8),
+          size: 32,
         ),
       ),
     );
