@@ -8,6 +8,10 @@ import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../widgets/step_word_identity.dart';
 import '../../../home/presentation/providers/navigation_provider.dart';
 import '../../../lessons/presentation/screens/create_lesson_wizard_screen.dart';
+import '../../../lessons/presentation/screens/story_editor_screen.dart';
+import '../../../lessons/presentation/screens/story_reader_screen.dart';
+import '../../../lessons/presentation/providers/stories_provider.dart';
+import '../../../lessons/domain/models/story_model.dart';
 import '../widgets/card_editor_widget.dart';
 
 class CreateCardScreen extends ConsumerStatefulWidget {
@@ -394,16 +398,89 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                             subtitle: 'LECTURAS',
                             icon: Icons.auto_stories_rounded,
                             gradient: const [Color(0xFF4FA4F4), Color(0xFF4CD9A3)],
-                            isFuture: true,
+                            isFuture: false,
                             onTap: () {
-                              _showFutureFeatureSnackbar(context, 'Crear Relato');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const StoryEditorScreen(),
+                                ),
+                              );
                             },
                           ),
                         ),
                       ],
                     ),
                     
-                    const Spacer(),
+                    const SizedBox(height: 32),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Relatos y Lecturas',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Inter',
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        Icon(
+                          Icons.menu_book_rounded,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: ref.watch(storiesListProvider).when(
+                        data: (stories) {
+                          if (stories.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.auto_stories_outlined,
+                                    color: AppColors.onSurfaceMuted.withOpacity(0.4),
+                                    size: 48,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'No hay relatos todavía.',
+                                    style: TextStyle(
+                                      color: AppColors.onSurfaceMuted.withOpacity(0.8),
+                                      fontSize: 13,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: stories.length,
+                            itemBuilder: (context, index) {
+                              final story = stories[index];
+                              return _buildStoryItemCard(context, story);
+                            },
+                          );
+                        },
+                        loading: () => const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        error: (err, stack) => Center(
+                          child: Text(
+                            'Error al cargar relatos: $err',
+                            style: const TextStyle(color: AppColors.error),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -705,6 +782,77 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Widget _buildStoryItemCard(BuildContext context, StoryModel story) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border.withOpacity(0.8), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.01),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [Color(0xFF4FA4F4), Color(0xFF4CD9A3)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Icon(
+            Icons.menu_book_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          story.title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Inter',
+            color: AppColors.onSurface,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4.0),
+          child: Text(
+            '${story.language.toUpperCase()} • Nivel ${story.difficulty} • ${story.content.split(' ').length} palabras',
+            style: const TextStyle(
+              fontSize: 11,
+              fontFamily: 'Inter',
+              color: AppColors.onSurfaceMuted,
+            ),
+          ),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          color: AppColors.onSurfaceMuted,
+          size: 14,
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => StoryReaderScreen(story: story),
+            ),
+          );
+        },
       ),
     );
   }

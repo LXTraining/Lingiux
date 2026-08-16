@@ -6,7 +6,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/audio_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/study_group.dart';
-import '../../domain/entities/chat_entity.dart';
 import '../../data/models/chat_model.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
@@ -433,7 +432,6 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
 
   // PESTAÑA 2: EVOLUCIÓN (PLANTA / TAMAGOTCHI)
   Widget _buildEvolutionTab() {
-    final isPlant = widget.group.growthType == 'PLANT';
     final level = widget.group.level;
     final points = widget.group.growthPoints;
 
@@ -443,49 +441,17 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
     final nextLevelPoints = 100 - ptsInLevel;
 
     // Mascota metadatos visuales
-    IconData mascotIcon;
-    String mascotName;
     String mascotStage;
-    List<Color> colors;
+    const colors = [Color(0xFF10B981), Color(0xFF059669)];
 
-    if (isPlant) {
-      colors = const [Color(0xFF10B981), Color(0xFF059669)];
-      if (level <= 1) {
-        mascotIcon = Icons.spa_rounded;
-        mascotName = 'Semilla de Racha';
-        mascotStage = 'Bebé';
-      } else if (level == 2) {
-        mascotIcon = Icons.grass_rounded;
-        mascotName = 'Brote de Racha';
-        mascotStage = 'Infantil';
-      } else if (level == 3) {
-        mascotIcon = Icons.eco_rounded;
-        mascotName = 'Planta Joven';
-        mascotStage = 'Juvenil';
-      } else {
-        mascotIcon = Icons.local_florist_rounded;
-        mascotName = 'Planta Floreciente';
-        mascotStage = 'Adulta';
-      }
+    if (level <= 1) {
+      mascotStage = 'Bebé';
+    } else if (level == 2) {
+      mascotStage = 'Infantil';
+    } else if (level == 3) {
+      mascotStage = 'Juvenil';
     } else {
-      colors = const [Color(0xFF815BF5), Color(0xFF5A45FF)];
-      if (level <= 1) {
-        mascotIcon = Icons.egg_rounded;
-        mascotName = 'Huevo Lingiux';
-        mascotStage = 'Huevo';
-      } else if (level == 2) {
-        mascotIcon = Icons.child_care_rounded;
-        mascotName = 'Mascota Bebé';
-        mascotStage = 'Bebé';
-      } else if (level == 3) {
-        mascotIcon = Icons.cruelty_free_rounded;
-        mascotName = 'Tamagotchi Joven';
-        mascotStage = 'Juvenil';
-      } else {
-        mascotIcon = Icons.pets_rounded;
-        mascotName = 'Dragon Adulto';
-        mascotStage = 'Adulto';
-      }
+      mascotStage = 'Adulta';
     }
 
     final hasContributedAsync = ref.watch(hasContributedTodayProvider(widget.group.id));
@@ -495,95 +461,11 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
       padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
-          // Mascota Box Card
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [colors[0].withOpacity(0.15), colors[1].withOpacity(0.05)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(color: colors[0].withOpacity(0.2), width: 1.5),
-            ),
-            child: Column(
-              children: [
-                // Mascot 3D Pedestal
-                Container(
-                  width: 140,
-                  height: 140,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Base pedestal
-                      Positioned(
-                        bottom: 0,
-                        child: Container(
-                          width: 100,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: colors[0].withOpacity(0.2),
-                            borderRadius: const BorderRadius.all(Radius.elliptical(50, 10)),
-                          ),
-                        ),
-                      ),
-                      // Mascot Core Orb
-                      Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(colors: colors),
-                          boxShadow: [
-                            BoxShadow(
-                              color: colors[0].withOpacity(0.4),
-                              blurRadius: 20,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Icon(
-                            mascotIcon,
-                            color: Colors.white,
-                            size: 44,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Name & Stage
-                Text(
-                  mascotName,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.onSurface,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: colors[0].withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Estado: $mascotStage',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: colors[0],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          // Mascota Box Card (Planta Interactiva y Animada de Racha)
+          GroupMascotPlantWidget(
+            level: level,
+            stageName: mascotStage,
+            colors: colors,
           ),
           const SizedBox(height: 28),
 
@@ -943,4 +825,544 @@ class _InviteStudentsSheetState extends ConsumerState<_InviteStudentsSheet> {
       ),
     );
   }
+}
+
+class GroupMascotPlantWidget extends StatefulWidget {
+  final int level;
+  final String stageName;
+  final List<Color> colors;
+
+  const GroupMascotPlantWidget({
+    super.key,
+    required this.level,
+    required this.stageName,
+    required this.colors,
+  });
+
+  @override
+  State<GroupMascotPlantWidget> createState() => _GroupMascotPlantWidgetState();
+}
+
+class _GroupMascotPlantWidgetState extends State<GroupMascotPlantWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _floatAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _rotateAnimation;
+
+  String _currentSpeech = '¡Hola! Ayúdame a crecer fuerte aportando tus días de racha. 🌱';
+  bool _isPressed = false;
+
+  final List<String> _speeches = [
+    '¡Hola! Con tu racha diaria me ayudas a crecer fuerte. 🌱',
+    '¡Glup! El agua de tus rachas sabe deliciosa. 💧',
+    '¡Mmm... siento el sol del aprendizaje brillando sobre mí! ☀️',
+    '¡Sigan practicando en equipo para verme florecer! 🌸',
+    '¡Zzz... mis hojas están descansando del inglés! 🍃',
+    '¡Hojas listas, mentes listas! ¡A practicar hoy! 📚',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
+
+    _floatAnimation = Tween<double>(begin: 0.0, end: -8.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _rotateAnimation = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.linear,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapMascot() {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isPressed = true;
+      final random = math.Random();
+      String nextSpeech;
+      do {
+        nextSpeech = _speeches[random.nextInt(_speeches.length)];
+      } while (nextSpeech == _currentSpeech && _speeches.length > 1);
+      _currentSpeech = nextSpeech;
+    });
+
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) {
+        setState(() {
+          _isPressed = false;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 310,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [widget.colors[0].withOpacity(0.15), widget.colors[1].withOpacity(0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: widget.colors[0].withOpacity(0.2), width: 1.5),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          // 1. Partículas/círculos decorativos de fondo con brillos suaves
+          Positioned(
+            top: 60,
+            left: 50,
+            child: _buildGlowingBubble(16, widget.colors[0].withOpacity(0.15)),
+          ),
+          Positioned(
+            bottom: 80,
+            right: 60,
+            child: _buildGlowingBubble(24, widget.colors[1].withOpacity(0.1)),
+          ),
+          Positioned(
+            top: 100,
+            right: 45,
+            child: _buildGlowingBubble(12, Colors.white.withOpacity(0.25)),
+          ),
+
+          // 2. Globo de Diálogo Flotante (Speech Balloon)
+          Positioned(
+            top: 20,
+            child: AnimatedOpacity(
+              opacity: 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    constraints: const BoxConstraints(maxWidth: 250),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      _currentSpeech,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.onSurface,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Inter',
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: -5,
+                    child: Transform.rotate(
+                      angle: math.pi / 4,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 3. Pedestal / Plataforma
+          Positioned(
+            bottom: 95,
+            child: Container(
+              width: 140,
+              height: 16,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.all(Radius.elliptical(140, 16)),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.4),
+                    Colors.white.withOpacity(0.1),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.6),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.colors[0].withOpacity(0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 4. Planta Flotante (Cuerpo y animación)
+          Positioned(
+            bottom: 102,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, _floatAnimation.value),
+                  child: GestureDetector(
+                    onTap: _onTapMascot,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Aura trasera resplandeciente
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: widget.colors[0].withOpacity(0.25),
+                                blurRadius: 25,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Anillo orbital rotando
+                        Transform.rotate(
+                          angle: _rotateAnimation.value,
+                          child: CustomPaint(
+                            size: const Size(110, 110),
+                            painter: PlantOrbitalRingPainter(color: widget.colors[0]),
+                          ),
+                        ),
+
+                        // Planta del grupo
+                        AnimatedScale(
+                          scale: _isPressed ? 0.85 : _scaleAnimation.value,
+                          duration: const Duration(milliseconds: 150),
+                          curve: Curves.easeOutBack,
+                          child: _buildPlantVisual(widget.level, widget.colors),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // 5. Nombre y estadísticas de nivel abajo de la tarjeta
+          Positioned(
+            bottom: 20,
+            child: Column(
+              children: [
+                Text(
+                  widget.level <= 1
+                      ? 'Semilla de Racha'
+                      : widget.level == 2
+                          ? 'Brote de Racha'
+                          : widget.level == 3
+                              ? 'Planta Joven'
+                              : 'Planta Floreciente',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurface,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: widget.colors[0].withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Estado: ${widget.stageName}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: widget.colors[0],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlowingBubble(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+      ),
+    );
+  }
+
+  Widget _buildPlantVisual(int level, List<Color> colors) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildPlantBody(level, colors),
+        const SizedBox(height: 2),
+        _buildPot(),
+      ],
+    );
+  }
+
+  Widget _buildPot() {
+    return Container(
+      width: 48,
+      height: 26,
+      decoration: const BoxDecoration(
+        color: Color(0xFFD97706), // Terracotta clay pot
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(8),
+          bottomRight: Radius.circular(8),
+          topLeft: Radius.circular(2),
+          topRight: Radius.circular(2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Container(
+            width: 52,
+            height: 6,
+            decoration: BoxDecoration(
+              color: const Color(0xFFB45309),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Positioned(
+            bottom: 4,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('◡', style: TextStyle(color: Colors.white, fontSize: 8, height: 1.0, fontWeight: FontWeight.bold)),
+                SizedBox(width: 4),
+                Text('◡', style: TextStyle(color: Colors.white, fontSize: 8, height: 1.0, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlantBody(int level, List<Color> colors) {
+    if (level <= 1) {
+      return Container(
+        width: 30,
+        height: 30,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Icon(Icons.spa_rounded, color: colors[0], size: 24),
+            const Positioned(
+              top: 6,
+              child: Row(
+                children: [
+                  Text('z', style: TextStyle(fontSize: 6, color: Colors.white70)),
+                  Text('Z', style: TextStyle(fontSize: 8, color: Colors.white70)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (level == 2) {
+      return Container(
+        width: 40,
+        height: 40,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Icon(Icons.grass_rounded, color: colors[0], size: 36),
+            const Positioned(
+              bottom: 8,
+              child: Row(
+                children: [
+                  Text('•', style: TextStyle(color: Colors.white, fontSize: 8)),
+                  SizedBox(width: 4),
+                  Text('•', style: TextStyle(color: Colors.white, fontSize: 8)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (level == 3) {
+      return Container(
+        width: 50,
+        height: 55,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Icon(Icons.eco_rounded, color: colors[0], size: 48),
+            const Positioned(
+              bottom: 16,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text('•', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      SizedBox(width: 8),
+                      Text('•', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Text('‿', style: TextStyle(color: Colors.white, fontSize: 8, height: 0.8)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        width: 60,
+        height: 65,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned(
+              bottom: 0,
+              child: Icon(Icons.eco_rounded, color: colors[0], size: 50),
+            ),
+            Positioned(
+              top: 0,
+              child: Container(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.pinkAccent,
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.local_florist_rounded, color: Colors.pinkAccent, size: 28),
+              ),
+            ),
+            const Positioned(
+              bottom: 14,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text('^', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      SizedBox(width: 8),
+                      Text('^', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Text('o', style: TextStyle(color: Colors.white, fontSize: 7, height: 0.8)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+}
+
+class PlantOrbitalRingPainter extends CustomPainter {
+  final Color color;
+  const PlantOrbitalRingPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final rect = Rect.fromCenter(
+      center: center,
+      width: size.width,
+      height: size.height * 0.35,
+    );
+
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final path = Path()..addOval(rect);
+    
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(-0.25);
+    canvas.translate(-center.dx, -center.dy);
+    
+    const double dashWidth = 5;
+    const double dashSpace = 5;
+    
+    for (final metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final length = math.min(dashWidth, metric.length - distance);
+        final extract = metric.extractPath(distance, distance + length);
+        canvas.drawPath(extract, paint);
+        distance += dashWidth + dashSpace;
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
