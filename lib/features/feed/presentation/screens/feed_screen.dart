@@ -32,6 +32,390 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     super.dispose();
   }
 
+  Widget _buildAppBarStat({
+    required Widget icon,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          const SizedBox(width: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLanguageSelectorBottomSheet(BuildContext context, String currentLang) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Idiomas en Curso',
+                style: TextStyle(
+                  color: AppColors.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildLanguageItem(context, '🇺🇸', 'Inglés', currentLang == 'Inglés'),
+              _buildLanguageItem(context, '🇩🇪', 'Alemán', currentLang == 'Alemán'),
+              _buildLanguageItem(context, '🇫🇷', 'Francés', currentLang == 'Francés'),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  HapticFeedback.lightImpact();
+                },
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Agregar Curso'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLanguageItem(BuildContext context, String flag, String name, bool isActive) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isActive ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
+        border: Border.all(
+          color: isActive ? AppColors.primary : AppColors.border,
+          width: isActive ? 1.5 : 1.0,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: Text(flag, style: const TextStyle(fontSize: 20)),
+        title: Text(
+          name,
+          style: TextStyle(
+            color: AppColors.onSurface,
+            fontSize: 13,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            fontFamily: 'Inter',
+          ),
+        ),
+        trailing: isActive ? const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20) : null,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  void _showStreakBottomSheet(BuildContext context, int streakCount) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFF9600), size: 64),
+              const SizedBox(height: 16),
+              Text(
+                streakCount == 0 ? '¡Empieza tu racha!' : '$streakCount Días de Racha',
+                style: const TextStyle(
+                  color: AppColors.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Completa al menos una lección todos los días para mantener activa tu racha y ganar gemas de recompensa.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.onSurfaceMuted,
+                  fontSize: 12,
+                  height: 1.4,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Calendario Semanal
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day) {
+                  final isToday = day == 'S'; // Mock today
+                  return Column(
+                    children: [
+                      Text(
+                        day,
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isToday
+                              ? const Color(0xFFFF9600)
+                              : Colors.grey.shade200,
+                        ),
+                        child: Icon(
+                          Icons.local_fire_department_rounded,
+                          color: isToday ? Colors.white : Colors.grey.shade400,
+                          size: 14,
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showGemsBottomSheet(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Icon(Icons.diamond_rounded, color: Color(0xFF00D2FF), size: 64),
+              const SizedBox(height: 16),
+              const Text(
+                '350 Gemas',
+                style: TextStyle(
+                  color: AppColors.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Obtienes gemas al completar lecciones y mantener rachas. ¡Úsalas en la tienda de mascotas para comprar comida, sombreros o juguetes para tu Tamagotchi!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.onSurfaceMuted,
+                  fontSize: 12,
+                  height: 1.4,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showLivesBottomSheet(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Icon(Icons.favorite_rounded, color: Color(0xFFFF4B4B), size: 64),
+              const SizedBox(height: 16),
+              const Text(
+                '5/5 Vidas',
+                style: TextStyle(
+                  color: AppColors.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Tienes todas las vidas completas. Si te equivocas en las lecciones, perderás vidas. Se regenera 1 vida cada 4 horas.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.onSurfaceMuted,
+                  fontSize: 12,
+                  height: 1.4,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showXPBottomSheet(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Icon(Icons.bolt_rounded, color: Color(0xFFFFD000), size: 64),
+              const SizedBox(height: 16),
+              const Text(
+                '1,240 XP Acumulados',
+                style: TextStyle(
+                  color: AppColors.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Has acumulado 1,240 puntos de experiencia en Lingiux. ¡Sigue completando lecciones para ascender en la liga semanal y competir contra otros estudiantes!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.onSurfaceMuted,
+                  fontSize: 12,
+                  height: 1.4,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Degradado oficial morado/índigo estático
@@ -165,13 +549,65 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                   );
                 },
               ),
-              title: const Text(AppStrings.navInicio),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined),
-                  onPressed: () {},
-                ),
-              ],
+              title: Builder(
+                builder: (context) {
+                  final profile = ref.watch(profileProvider).value;
+                  final streakCount = profile?['streak_count'] as int? ?? 0;
+                  final targetLanguage = profile?['target_language'] as String? ?? 'Inglés';
+                  final flag = targetLanguage == 'Alemán' ? '🇩🇪' : '🇺🇸';
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // 1. Selector de Idioma
+                      GestureDetector(
+                        onTap: () => _showLanguageSelectorBottomSheet(context, targetLanguage),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(flag, style: const TextStyle(fontSize: 16)),
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: Colors.white.withValues(alpha: 0.7),
+                              size: 14,
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // 2. Racha (Fuego)
+                      _buildAppBarStat(
+                        icon: const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFF9600), size: 20),
+                        value: '$streakCount',
+                        onTap: () => _showStreakBottomSheet(context, streakCount),
+                      ),
+
+                      // 3. Gemas (Diamante)
+                      _buildAppBarStat(
+                        icon: const Icon(Icons.diamond_rounded, color: Color(0xFF00D2FF), size: 20),
+                        value: '350',
+                        onTap: () => _showGemsBottomSheet(context),
+                      ),
+
+                      // 4. Vidas (Corazón)
+                      _buildAppBarStat(
+                        icon: const Icon(Icons.favorite_rounded, color: Color(0xFFFF4B4B), size: 20),
+                        value: '5',
+                        onTap: () => _showLivesBottomSheet(context),
+                      ),
+
+                      // 5. XP (Rayo)
+                      _buildAppBarStat(
+                        icon: const Icon(Icons.bolt_rounded, color: Color(0xFFFFD000), size: 20),
+                        value: '1.2k',
+                        onTap: () => _showXPBottomSheet(context),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              actions: const [],
             ),
             body: LayoutBuilder(
               builder: (context, constraints) {
