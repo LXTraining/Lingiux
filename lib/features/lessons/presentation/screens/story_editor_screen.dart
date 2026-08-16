@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../providers/stories_provider.dart';
+import '../widgets/story_background_widget.dart';
 
 class StoryEditorScreen extends ConsumerStatefulWidget {
   const StoryEditorScreen({super.key});
@@ -19,6 +20,7 @@ class _StoryEditorScreenState extends ConsumerState<StoryEditorScreen> {
 
   String _selectedLanguage = 'Inglés';
   String _selectedDifficulty = 'A1';
+  String _selectedThemeId = 'parchment';
   bool _isSaving = false;
 
   final List<String> _languages = ['Inglés', 'Español', 'Francés', 'Alemán', 'Italiano', 'Portugués'];
@@ -50,6 +52,9 @@ class _StoryEditorScreenState extends ConsumerState<StoryEditorScreen> {
         content: _contentController.text.trim(),
         language: _selectedLanguage,
         difficulty: _selectedDifficulty,
+        metadata: {
+          'theme_id': _selectedThemeId,
+        },
       );
 
       // Invalidar provider para actualizar listas
@@ -226,6 +231,127 @@ class _StoryEditorScreenState extends ConsumerState<StoryEditorScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 24),
+
+                // Selector de Fondo
+                const Text(
+                  'Fondo del Relato',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                    color: AppColors.onSurfaceMuted,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 86,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: StoryBackgroundWidget.themes.length,
+                    itemBuilder: (context, index) {
+                      final theme = StoryBackgroundWidget.themes[index];
+                      final isSelected = theme.id == _selectedThemeId;
+
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            _selectedThemeId = theme.id;
+                          });
+                        },
+                        child: Container(
+                          width: 140,
+                          margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: theme.gradientColors,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            border: Border.all(
+                              color: isSelected ? AppColors.primary : AppColors.border,
+                              width: isSelected ? 2.0 : 1.0,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Stack(
+                            children: [
+                              // Previsualizaciones de los patrones en miniatura
+                              if (theme.patternType == PatternType.blobs) ...[
+                                Positioned(
+                                  top: -15,
+                                  right: -15,
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: theme.topRightBlobColor.withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: -15,
+                                  left: -15,
+                                  child: Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: theme.bottomLeftBlobColor.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if (theme.patternType == PatternType.grid)
+                                const Positioned.fill(
+                                  child: GridPatternPainterWidget(color: Color(0xFFE2E8F0)),
+                                ),
+                              if (theme.patternType == PatternType.lines)
+                                const Positioned.fill(
+                                  child: LinesPatternPainterWidget(
+                                    lineColor: Color(0xFFE2E8F0),
+                                    marginColor: Color(0xFFFDA4AF),
+                                  ),
+                                ),
+                              if (theme.patternType == PatternType.stars)
+                                const Positioned.fill(
+                                  child: StarsPatternPainterWidget(),
+                                ),
+
+                              // Check icon and name
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: isSelected
+                                    ? const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)
+                                    : const SizedBox.shrink(),
+                              ),
+                              Positioned(
+                                bottom: 8,
+                                left: 10,
+                                right: 10,
+                                child: Text(
+                                  theme.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: theme.textColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 24),
 

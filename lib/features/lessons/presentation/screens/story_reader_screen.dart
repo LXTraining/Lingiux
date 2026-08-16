@@ -10,6 +10,7 @@ import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 import '../../../chat/presentation/screens/chat_detail_screen.dart';
 import '../../domain/models/story_model.dart';
+import '../widgets/story_background_widget.dart';
 
 class StoryReaderScreen extends ConsumerStatefulWidget {
   final StoryModel story;
@@ -403,18 +404,18 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
     Overlay.of(context).insert(_overlayEntry!);
   }
 
-  Color _getCategoryColor(String category) {
+  Color _getCategoryColor(String category, Color defaultColor) {
     switch (category.toUpperCase()) {
       case 'VERBO':
         return const Color(0xFFEF4444); // Rojo coral
       case 'SUSTANTIVO':
         return const Color(0xFF10B981); // Verde esmeralda
       case 'ADJETIVO':
-        return const Color(0xFF3B82F6); // Azul
+        return const Color(0xFF38BDF8); // Lighter blue for better contrast
       case 'ADVERBIO':
         return const Color(0xFFF59E0B); // Ámbar
       default:
-        return AppColors.onSurface;
+        return defaultColor;
     }
   }
 
@@ -422,31 +423,27 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
   Widget build(BuildContext context) {
     final wordCardsAsync = ref.watch(wordCardsProvider);
     final userCards = wordCardsAsync.value ?? [];
+    final activeThemeId = widget.story.metadata['theme_id'] as String? ?? 'parchment';
+    final activeTheme = StoryBackgroundWidget.themes.firstWhere(
+      (t) => t.id == activeThemeId,
+      orElse: () => StoryBackgroundWidget.themes.first,
+    );
 
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFDFBF7), // Warm parchment cream
-            Color(0xFFF5EDE0), // Soft sepia beige
-          ],
-        ),
-      ),
+    return StoryBackgroundWidget(
+      themeId: activeThemeId,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_rounded, color: AppColors.onSurface, size: 20),
+            icon: Icon(Icons.arrow_back_ios_rounded, color: activeTheme.iconColor, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(
             widget.story.title.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.primary,
+            style: TextStyle(
+              color: activeTheme.primaryTextColor,
               fontWeight: FontWeight.bold,
               fontSize: 14,
               fontFamily: 'Inter',
@@ -459,7 +456,7 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
             IconButton(
               icon: Icon(
                 _isGrammarHighlightEnabled ? Icons.palette_rounded : Icons.palette_outlined,
-                color: _isGrammarHighlightEnabled ? AppColors.primary : AppColors.onSurfaceMuted,
+                color: _isGrammarHighlightEnabled ? activeTheme.primaryTextColor : activeTheme.textColor.withValues(alpha: 0.6),
               ),
               tooltip: 'Resaltado Gramatical',
               onPressed: () {
@@ -471,7 +468,7 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
             ),
             // Botón tamaño de letra
             IconButton(
-              icon: const Icon(Icons.text_fields_rounded, color: AppColors.onSurface),
+              icon: Icon(Icons.text_fields_rounded, color: activeTheme.iconColor),
               onPressed: () {
                 setState(() {
                   if (_fontSize >= 20.0) {
@@ -488,32 +485,6 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
         body: SafeArea(
           child: Stack(
             children: [
-              // Blob decorativo superior derecho (Melón suave)
-              Positioned(
-                top: -60,
-                right: -60,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFFEADCC9).withValues(alpha: 0.35),
-                  ),
-                ),
-              ),
-              // Blob decorativo inferior izquierdo (Lavanda de la marca)
-              Positioned(
-                bottom: 40,
-                left: -80,
-                child: Container(
-                  width: 250,
-                  height: 250,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFFDCD3FF).withValues(alpha: 0.25),
-                  ),
-                ),
-              ),
               // Contenedor del texto del Relato
               Positioned.fill(
                 bottom: 80, // Espacio para el panel de audio
@@ -521,199 +492,216 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 16.0),
                   child: Wrap(
-                  alignment: WrapAlignment.start,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: _tokens.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final token = entry.value;
+                    alignment: WrapAlignment.start,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: _tokens.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final token = entry.value;
 
-                    final isBeforeActive = _currentWordIndex != -1 && index < _currentWordIndex;
-                    final isActiveHighlight = index == _currentWordIndex;
+                      final isBeforeActive = _currentWordIndex != -1 && index < _currentWordIndex;
+                      final isActiveHighlight = index == _currentWordIndex;
 
-                    if (!token.isWord) {
+                      if (!token.isWord) {
+                        return AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: isBeforeActive ? 0.35 : 1.0,
+                          child: Text(
+                            token.text,
+                            style: TextStyle(
+                              fontSize: _fontSize,
+                              height: 1.6,
+                              fontFamily: 'Inter',
+                              color: activeTheme.textColor.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        );
+                      }
+
+                      // Resolver si existe tarjeta para esta palabra
+                      final cleanText = token.text.toLowerCase().trim();
+                      WordCardModel? matchedCard;
+                      for (final card in userCards) {
+                        if (card.word.toLowerCase().trim() == cleanText) {
+                          matchedCard = card;
+                          break;
+                        }
+                      }
+
+                      // Determinar categoría morfosintáctica
+                      final category = token.category ?? matchedCard?.category;
+
+                      // Estilo de texto coloreado por tipo gramatical
+                      Color textColor = activeTheme.textColor;
+                      FontWeight fontWeight = FontWeight.normal;
+                      TextDecoration decoration = TextDecoration.none;
+
+                      if (_isGrammarHighlightEnabled && category != null) {
+                        textColor = _getCategoryColor(category, activeTheme.textColor);
+                        fontWeight = FontWeight.bold;
+                      }
+
+                      // Si coincide con una tarjeta de vocabulario, añadir subrayado suave decorativo
+                      if (matchedCard != null) {
+                        decoration = TextDecoration.underline;
+                      }
+
                       return AnimatedOpacity(
                         duration: const Duration(milliseconds: 200),
                         opacity: isBeforeActive ? 0.35 : 1.0,
-                        child: Text(
-                          token.text,
-                          style: TextStyle(
+                        child: _StoryWordWidget(
+                          token: token,
+                          matchedCard: matchedCard,
+                          textStyle: TextStyle(
                             fontSize: _fontSize,
                             height: 1.6,
                             fontFamily: 'Inter',
-                            color: AppColors.onSurface.withValues(alpha: 0.8),
+                            color: isActiveHighlight 
+                                ? const Color(0xFF7C3AED)
+                                : (isBeforeActive ? textColor.withValues(alpha: 0.4) : textColor),
+                            fontWeight: isActiveHighlight ? FontWeight.bold : fontWeight,
+                            decoration: isActiveHighlight ? TextDecoration.none : decoration,
+                            decorationColor: textColor.withValues(alpha: 0.5),
+                            decorationStyle: TextDecorationStyle.dashed,
                           ),
+                          isActiveHighlight: isActiveHighlight,
+                          onTap: (word, card, wordCenter, wordSize) {
+                            _showWordCard(word, card, wordCenter, wordSize);
+                          },
                         ),
                       );
-                    }
-
-                    // Resolver si existe tarjeta para esta palabra
-                    final cleanText = token.text.toLowerCase().trim();
-                    WordCardModel? matchedCard;
-                    for (final card in userCards) {
-                      if (card.word.toLowerCase().trim() == cleanText) {
-                        matchedCard = card;
-                        break;
-                      }
-                    }
-
-                    // Determinar categoría morfosintáctica
-                    final category = token.category ?? matchedCard?.category;
-
-                    // Estilo de texto coloreado por tipo gramatical
-                    Color textColor = AppColors.onSurface;
-                    FontWeight fontWeight = FontWeight.normal;
-                    TextDecoration decoration = TextDecoration.none;
-
-                    if (_isGrammarHighlightEnabled && category != null) {
-                      textColor = _getCategoryColor(category);
-                      fontWeight = FontWeight.bold;
-                    }
-
-                    // Si coincide con una tarjeta de vocabulario, añadir subrayado suave decorativo
-                    if (matchedCard != null) {
-                      decoration = TextDecoration.underline;
-                    }
-
-                    return AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: isBeforeActive ? 0.35 : 1.0,
-                      child: _StoryWordWidget(
-                        token: token,
-                        matchedCard: matchedCard,
-                        textStyle: TextStyle(
-                          fontSize: _fontSize,
-                          height: 1.6,
-                          fontFamily: 'Inter',
-                          color: isActiveHighlight 
-                              ? const Color(0xFF7C3AED)
-                              : (isBeforeActive ? textColor.withValues(alpha: 0.4) : textColor),
-                          fontWeight: isActiveHighlight ? FontWeight.bold : fontWeight,
-                          decoration: isActiveHighlight ? TextDecoration.none : decoration,
-                          decorationColor: textColor.withValues(alpha: 0.5),
-                          decorationStyle: TextDecorationStyle.dashed,
-                        ),
-                        isActiveHighlight: isActiveHighlight,
-                        onTap: (word, card, wordCenter, wordSize) {
-                          _showWordCard(word, card, wordCenter, wordSize);
-                        },
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-
-            // Reproductor de Audio Flotante
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 20,
-              child: Container(
-                height: 64,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.95),
-                  borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: AppColors.border.withValues(alpha: 0.8), width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    children: [
-                      // Badge de Dificultad
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          widget.story.difficulty,
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-
-                      // Botón Stop
-                      if (_isPlaying || _currentWordIndex != -1)
-                        IconButton(
-                          icon: const Icon(Icons.stop_rounded, color: AppColors.onSurfaceMuted, size: 24),
-                          onPressed: _stop,
-                        ),
-
-                      // Botón Play / Pause
-                      GestureDetector(
-                        onTap: _speak,
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFF0F172A),
-                          ),
-                          child: Icon(
-                            _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 26,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-
-                      // Selector de Velocidad (TTS Speed)
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          setState(() {
-                            if (_speechRate == 0.5) {
-                              _speechRate = 0.35; // Más lento
-                            } else if (_speechRate == 0.35) {
-                              _speechRate = 0.65; // Más rápido
-                            } else {
-                              _speechRate = 0.5; // Normal
-                            }
-                          });
-                          if (_isPlaying) {
-                            _flutterTts.setSpeechRate(_speechRate);
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            _speechRate == 0.5
-                                ? '1.0x'
-                                : _speechRate == 0.35
-                                    ? '0.7x'
-                                    : '1.3x',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Inter',
-                              color: AppColors.onSurface,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    }).toList(),
                   ),
                 ),
               ),
-            ),
+
+              // Reproductor de Audio Flotante
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 20,
+                child: Container(
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: activeTheme.isDark
+                        ? const Color(0xFF1E293B).withValues(alpha: 0.95)
+                        : Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(32),
+                    border: Border.all(
+                      color: activeTheme.isDark
+                          ? Colors.white.withValues(alpha: 0.15)
+                          : AppColors.border.withValues(alpha: 0.8),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: activeTheme.isDark ? 0.3 : 0.04),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Row(
+                      children: [
+                        // Badge de Dificultad
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: activeTheme.isDark
+                                ? const Color(0xFF8B5CF6).withValues(alpha: 0.15)
+                                : AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            widget.story.difficulty,
+                            style: TextStyle(
+                              color: activeTheme.isDark ? const Color(0xFFA78BFA) : AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+
+                        // Botón Stop
+                        if (_isPlaying || _currentWordIndex != -1)
+                          IconButton(
+                            icon: Icon(
+                              Icons.stop_rounded,
+                              color: activeTheme.textColor.withValues(alpha: 0.6),
+                              size: 24,
+                            ),
+                            onPressed: _stop,
+                          ),
+
+                        // Botón Play / Pause
+                        GestureDetector(
+                          onTap: _speak,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: activeTheme.isDark ? const Color(0xFF8B5CF6) : const Color(0xFF0F172A),
+                            ),
+                            child: Icon(
+                              _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+
+                        // Selector de Velocidad (TTS Speed)
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() {
+                              if (_speechRate == 0.5) {
+                                _speechRate = 0.35; // Más lento
+                              } else if (_speechRate == 0.35) {
+                                _speechRate = 0.65; // Más rápido
+                              } else {
+                                _speechRate = 0.5; // Normal
+                              }
+                            });
+                            if (_isPlaying) {
+                              _flutterTts.setSpeechRate(_speechRate);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: activeTheme.isDark
+                                    ? Colors.white.withValues(alpha: 0.25)
+                                    : AppColors.border,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              _speechRate == 0.5
+                                  ? '1.0x'
+                                  : _speechRate == 0.35
+                                      ? '0.7x'
+                                      : '1.3x',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Inter',
+                                color: activeTheme.textColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
