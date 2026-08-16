@@ -224,13 +224,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                             return LayoutBuilder(
                               builder: (context, constraints) {
                                 final width = constraints.maxWidth;
-                                const double rowHeight = 170.0;
+                                const double rowHeight = 200.0;
                                 const double nodeSize = 80.0;
                                 const double cardHeight = 92.0;
                                 final totalHeight = mockLessons.length * rowHeight + 40.0;
 
-                                // Fracciones de alineación X para el caminito ondulado
-                                final xFractions = [0.42, 0.65, 0.35, 0.70, 0.40, 0.65];
+                                // Fracciones de alineación X para el caminito ondulado (Variante A: Centrado Vertical)
+                                final xFractions = [0.50, 0.65, 0.35, 0.70, 0.40, 0.65];
 
                                 return SingleChildScrollView(
                                   controller: scrollController,
@@ -342,57 +342,56 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                                   onTap: () => _showLessonDetailsBottomSheet(context, mockLessons[index]),
                                                 ),
                                               ),
-                                              // 3. Comentarios al costado del nodo
+                                              // 3. Comentarios debajo del nodo (Variante A: Layout Vertical Puro)
                                               Builder(
                                                 builder: (context) {
                                                   final lesson = mockLessons[index];
                                                   final double xFraction = xFractions[index % xFractions.length];
                                                   final double centerX = width * xFraction;
                                                   final double nodeCenterY = index * rowHeight + rowHeight / 2;
-                                                  const double boxWidth = 175.0;
+                                                  const double boxWidth = 220.0;
 
-                                                  // Si xFraction <= 0.5, el nodo está a la izquierda/centro, el comentario va a la DERECHA.
-                                                  // Si xFraction > 0.5, el nodo está a la derecha, el comentario va a la IZQUIERDA.
-                                                  final bool placeOnRight = xFraction <= 0.5;
-
-                                                  final double boxLeft = placeOnRight
-                                                      ? (centerX + nodeSize / 2 + 8.0).clamp(12.0, width - boxWidth - 12.0)
-                                                      : (centerX - nodeSize / 2 - 8.0 - boxWidth).clamp(12.0, width - boxWidth - 12.0);
+                                                  final double boxLeft = (centerX - boxWidth / 2).clamp(12.0, width - boxWidth - 12.0);
 
                                                   return Positioned(
                                                     left: boxLeft,
                                                     width: boxWidth,
-                                                    top: nodeCenterY - 18.0, // Centrado verticalmente al costado del nodo
-                                                    child: Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                      decoration: BoxDecoration(
-                                                        color: lesson.isLocked
-                                                            ? Colors.white.withOpacity(0.75)
-                                                            : Colors.white.withOpacity(0.95),
-                                                        borderRadius: BorderRadius.circular(16),
-                                                        border: Border.all(
+                                                    top: nodeCenterY + nodeSize / 2 + 8.0, // Posicionamiento vertical inferior debajo del nodo
+                                                    child: GestureDetector(
+                                                      onTap: () {
+                                                        _showLessonDetailsBottomSheet(context, lesson, initialTab: 1);
+                                                      },
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                        decoration: BoxDecoration(
                                                           color: lesson.isLocked
-                                                              ? Colors.grey.shade300
-                                                              : AppColors.border.withOpacity(0.5),
-                                                          width: 1.0,
-                                                        ),
-                                                        boxShadow: [
-                                                          BoxShadow(
-                                                            color: Colors.black.withOpacity(0.04),
-                                                            blurRadius: 4,
-                                                            offset: const Offset(0, 2),
+                                                              ? Colors.white.withOpacity(0.75)
+                                                              : Colors.white.withOpacity(0.95),
+                                                          borderRadius: BorderRadius.circular(16),
+                                                          border: Border.all(
+                                                            color: lesson.isLocked
+                                                                ? Colors.grey.shade300
+                                                                : AppColors.border.withOpacity(0.5),
+                                                            width: 1.0,
                                                           ),
-                                                        ],
-                                                      ),
-                                                      child: EchoCommentsWidget(
-                                                        comments: lesson.isLocked
-                                                            ? const [
-                                                                LessonComment(
-                                                                  text: "Opiniones bloqueadas 🔒",
-                                                                  userName: "Sistema",
-                                                                ),
-                                                              ]
-                                                            : lesson.comments,
+                                                          boxShadow: [
+                                                            BoxShadow(
+                                                              color: Colors.black.withOpacity(0.04),
+                                                              blurRadius: 4,
+                                                              offset: const Offset(0, 2),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        child: EchoCommentsWidget(
+                                                          comments: lesson.isLocked
+                                                              ? const [
+                                                                  LessonComment(
+                                                                    text: "Opiniones bloqueadas 🔒",
+                                                                    userName: "Sistema",
+                                                                  ),
+                                                                ]
+                                                              : lesson.comments,
+                                                        ),
                                                       ),
                                                     ),
                                                   );
@@ -652,222 +651,516 @@ class _EchoCommentsWidgetState extends State<EchoCommentsWidget> {
   }
 }
 
-void _showLessonDetailsBottomSheet(BuildContext context, Lesson lesson) {
+void _showLessonDetailsBottomSheet(BuildContext context, Lesson lesson, {int initialTab = 0}) {
   HapticFeedback.mediumImpact();
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: (context) {
-      return Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 20,
-              offset: Offset(0, -5),
+  int activeTab = initialTab; // 0: General, 1: Comentarios, 2: Ranking
+
+  Widget buildTabButton(int index, String label, IconData icon, bool isActive, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isActive ? AppColors.primary : AppColors.onSurfaceMuted,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Inter',
+                color: isActive ? AppColors.onSurface : AppColors.onSurfaceMuted,
+              ),
             ),
           ],
         ),
-        padding: const EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 14,
-          bottom: 32,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      ),
+    );
+  }
+
+  Widget buildGeneralTab(Lesson lesson) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.primary,
+              backgroundImage: lesson.creatorAvatar != null && lesson.creatorAvatar!.isNotEmpty
+                  ? NetworkImage(lesson.creatorAvatar!)
+                  : null,
+              child: lesson.creatorAvatar == null || lesson.creatorAvatar!.isEmpty
+                  ? Text(
+                      lesson.creatorName.isNotEmpty
+                          ? lesson.creatorName.split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+                          : 'LX',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Inter',
+                      ),
+                    )
+                  : null,
             ),
-            const SizedBox(height: 24),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: lesson.gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Icon(
-                    lesson.icon,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            lesson.flag,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            lesson.category.toUpperCase(),
-                            style: TextStyle(
-                              color: lesson.gradient[0],
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        lesson.title,
-                        style: const TextStyle(
-                          color: AppColors.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const Divider(color: AppColors.border, height: 1),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppColors.primary,
-                  backgroundImage: lesson.creatorAvatar != null && lesson.creatorAvatar!.isNotEmpty
-                      ? NetworkImage(lesson.creatorAvatar!)
-                      : null,
-                  child: lesson.creatorAvatar == null || lesson.creatorAvatar!.isEmpty
-                      ? Text(
-                          lesson.creatorName.isNotEmpty
-                              ? lesson.creatorName.split(' ').map((e) => e[0]).take(2).join().toUpperCase()
-                              : 'LX',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Inter',
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        lesson.creatorName,
-                        style: const TextStyle(
-                          color: AppColors.onSurface,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                      const Text(
-                        'Creador/a verificado/a de la comunidad',
-                        style: TextStyle(
-                          color: AppColors.onSurfaceMuted,
-                          fontSize: 11,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Column(
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '¿Qué aprenderás?',
-                    style: TextStyle(
+                    lesson.creatorName,
+                    style: const TextStyle(
                       color: AppColors.onSurface,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                       fontFamily: 'Inter',
                     ),
                   ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Domina el vocabulario cotidiano y frases de uso común. Practica con audios grabados por hablantes nativos y pon a prueba tu pronunciación usando nuestro analizador de Inteligencia Artificial.',
+                  const Text(
+                    'Creador/a verificado/a de la comunidad',
                     style: TextStyle(
                       color: AppColors.onSurfaceMuted,
-                      fontSize: 12,
-                      height: 1.4,
+                      fontSize: 10,
                       fontFamily: 'Inter',
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 28),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                HapticFeedback.mediumImpact();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('¡Cargando lección "${lesson.title}"!'),
-                    backgroundColor: lesson.gradient[0],
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.onSurface,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                elevation: 0,
-              ),
-              child: const Text(
-                '¡Empezar Lección!',
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¿Qué aprenderás?',
                 style: TextStyle(
-                  fontSize: 14,
+                  color: AppColors.onSurface,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Inter',
                 ),
               ),
+              SizedBox(height: 4),
+              Text(
+                'Domina el vocabulario cotidiano y frases de uso común. Practica con audios grabados por hablantes nativos y pon a prueba tu pronunciación usando nuestro analizador de Inteligencia Artificial.',
+                style: TextStyle(
+                  color: AppColors.onSurfaceMuted,
+                  fontSize: 11,
+                  height: 1.4,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildCommentsTab(Lesson lesson) {
+    if (lesson.isLocked) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            Icon(Icons.lock_outline_rounded, color: Colors.grey.shade400, size: 36),
+            const SizedBox(height: 8),
+            Text(
+              'Opiniones bloqueadas 🔒',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Completa las lecciones previas para ver los comentarios.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontFamily: 'Inter'),
             ),
           ],
         ),
+      );
+    }
+
+    if (lesson.comments.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 36),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            Icon(Icons.chat_bubble_outline_rounded, color: Colors.grey.shade300, size: 32),
+            const SizedBox(height: 8),
+            const Text(
+              'No hay comentarios aún',
+              style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: lesson.comments.map((comment) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                backgroundImage: comment.avatarUrl != null && comment.avatarUrl!.isNotEmpty
+                    ? NetworkImage(comment.avatarUrl!)
+                    : null,
+                child: comment.avatarUrl == null || comment.avatarUrl!.isEmpty
+                    ? Text(
+                        comment.userName.isNotEmpty ? comment.userName[0].toUpperCase() : 'U',
+                        style: const TextStyle(color: AppColors.primary, fontSize: 8, fontWeight: FontWeight.bold),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          comment.userName,
+                          style: const TextStyle(color: AppColors.onSurface, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'hace 2 horas',
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 8, fontFamily: 'Inter'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      comment.text,
+                      style: const TextStyle(color: AppColors.onSurfaceMuted, fontSize: 11, height: 1.3, fontFamily: 'Inter'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget buildRankingsTab(Lesson lesson) {
+    if (lesson.isLocked) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            Icon(Icons.emoji_events_outlined, color: Colors.grey.shade400, size: 36),
+            const SizedBox(height: 8),
+            Text(
+              'Ranking bloqueado 🏆',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Completa esta lección para competir en la tabla.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontFamily: 'Inter'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final List<Map<String, dynamic>> rankingMock = [
+      {
+        'name': 'Sophia Martinez',
+        'score': '100% (2m 14s)',
+        'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+        'icon': '🥇',
+      },
+      {
+        'name': 'Liam Anderson',
+        'score': '95% (2m 30s)',
+        'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+        'icon': '🥈',
+      },
+      {
+        'name': 'Emma Watson',
+        'score': '90% (3m 05s)',
+        'avatar': 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
+        'icon': '🥉',
+      },
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Top de la Lección',
+          style: TextStyle(color: AppColors.onSurface, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+        ),
+        const SizedBox(height: 10),
+        Column(
+          children: rankingMock.map((row) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10.0),
+              child: Row(
+                children: [
+                  Text(
+                    row['icon'],
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundColor: AppColors.border,
+                    backgroundImage: NetworkImage(row['avatar']),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      row['name'],
+                      style: const TextStyle(color: AppColors.onSurface, fontSize: 11, fontWeight: FontWeight.w600, fontFamily: 'Inter'),
+                    ),
+                  ),
+                  Text(
+                    row['score'],
+                    style: const TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 20,
+                  offset: Offset(0, -5),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 14,
+              bottom: 32,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: lesson.gradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Icon(
+                        lesson.icon,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                lesson.flag,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                lesson.category.toUpperCase(),
+                                style: TextStyle(
+                                  color: lesson.gradient[0],
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            lesson.title,
+                            style: const TextStyle(
+                              color: AppColors.onSurface,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                // Barra de Pestañas Segmentada Premium
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: buildTabButton(
+                          0,
+                          'General',
+                          Icons.info_outline_rounded,
+                          activeTab == 0,
+                          () => setSheetState(() => activeTab = 0),
+                        ),
+                      ),
+                      Expanded(
+                        child: buildTabButton(
+                          1,
+                          'Opiniones',
+                          Icons.chat_bubble_outline_rounded,
+                          activeTab == 1,
+                          () => setSheetState(() => activeTab = 1),
+                        ),
+                      ),
+                      Expanded(
+                        child: buildTabButton(
+                          2,
+                          'Ranking',
+                          Icons.emoji_events_outlined,
+                          activeTab == 2,
+                          () => setSheetState(() => activeTab = 2),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                // Contenedor scrollable de altura fija para el contenido de los tabs
+                SizedBox(
+                  height: 180,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: activeTab == 0
+                        ? buildGeneralTab(lesson)
+                        : activeTab == 1
+                            ? buildCommentsTab(lesson)
+                            : buildRankingsTab(lesson),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    HapticFeedback.mediumImpact();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('¡Cargando lección "${lesson.title}"!'),
+                        backgroundColor: lesson.gradient[0],
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.onSurface,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    '¡Empezar Lección!',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       );
     },
   );
