@@ -251,95 +251,148 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   Widget _buildConversationPage(BuildContext context, ChatEntity chatEntity) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            _Avatar(
-              initials: widget.chat.initials,
-              colorIndex: widget.chat.avatarColorIndex,
-              size: 34,
-              avatarUrl: widget.chat.avatarUrl,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFDFBF7), // Warm parchment cream
+            Color(0xFFF5EDE0), // Soft sepia beige
+          ],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppColors.onSurface),
+          title: Row(
+            children: [
+              _Avatar(
+                initials: widget.chat.initials,
+                colorIndex: widget.chat.avatarColorIndex,
+                size: 34,
+                avatarUrl: widget.chat.avatarUrl,
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.chat.name,
+                    style: const TextStyle(
+                      color: AppColors.onSurface,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  if (widget.chat.isOnline)
+                    const Text(
+                      'en línea',
+                      style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 11,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                setState(() {
+                  _isFlagRibbonOpen = !_isFlagRibbonOpen;
+                });
+              },
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                  child: _buildFlagCircle(chatEntity.activeNationality, size: 28),
+                ),
+              ),
             ),
-            const SizedBox(width: 10),
+            IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
+            IconButton(
+              icon: const Icon(Icons.info_outline_rounded),
+              onPressed: () {
+                _pageController.animateToPage(
+                  1,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            // Blob decorativo superior derecho (Melón suave)
+            Positioned(
+              top: -60,
+              right: -60,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFEADCC9).withValues(alpha: 0.35),
+                ),
+              ),
+            ),
+            // Blob decorativo inferior izquierdo (Lavanda de la marca)
+            Positioned(
+              bottom: 120, // Por encima de la barra de entrada de texto
+              left: -80,
+              child: Container(
+                width: 250,
+                height: 250,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFDCD3FF).withValues(alpha: 0.25),
+                ),
+              ),
+            ),
+            // Contenido principal
             Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.chat.name,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                if (_isFlagRibbonOpen) _buildFlagRibbon(context, chatEntity),
+                Expanded(
+                  child: ref.watch(messagesProvider(widget.chat.id)).when(
+                    data: (messages) {
+                      if (messages.isEmpty) {
+                        return const Center(child: Text('No hay mensajes aún. ¡Comienza a chatear!'));
+                      }
+                      final reversedMessages = messages.reversed.toList();
+                      return ListView.builder(
+                        controller: _scrollController,
+                        reverse: true,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        itemCount: reversedMessages.length,
+                        itemBuilder: (context, index) => MessageBubble(
+                          message: reversedMessages[index],
+                          conversationId: widget.chat.id,
+                          onWordTap: _showWordCard,
+                        ),
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                    error: (error, stack) => Center(child: Text('Error al cargar mensajes: $error')),
                   ),
                 ),
-                if (widget.chat.isOnline)
-                  const Text(
-                    'en línea',
-                    style: TextStyle(color: AppColors.online, fontSize: 11),
-                  ),
+                _InputBar(controller: _controller, onSend: _sendMessage),
               ],
             ),
           ],
         ),
-        actions: [
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              setState(() {
-                _isFlagRibbonOpen = !_isFlagRibbonOpen;
-              });
-            },
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                child: _buildFlagCircle(chatEntity.activeNationality, size: 28),
-              ),
-            ),
-          ),
-          IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
-          IconButton(
-            icon: const Icon(Icons.info_outline_rounded),
-            onPressed: () {
-              _pageController.animateToPage(
-                1,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (_isFlagRibbonOpen) _buildFlagRibbon(context, chatEntity),
-          Expanded(
-            child: ref.watch(messagesProvider(widget.chat.id)).when(
-              data: (messages) {
-                if (messages.isEmpty) {
-                  return const Center(child: Text('No hay mensajes aún. ¡Comienza a chatear!'));
-                }
-                final reversedMessages = messages.reversed.toList();
-                return ListView.builder(
-                  controller: _scrollController,
-                  reverse: true,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  itemCount: reversedMessages.length,
-                  itemBuilder: (context, index) => MessageBubble(
-                    message: reversedMessages[index],
-                    conversationId: widget.chat.id,
-                    onWordTap: _showWordCard,
-                  ),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-              error: (error, stack) => Center(child: Text('Error al cargar mensajes: $error')),
-            ),
-          ),
-          _InputBar(controller: _controller, onSend: _sendMessage),
-        ],
       ),
     );
   }

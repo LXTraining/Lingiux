@@ -319,29 +319,51 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(widget.group.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.onSurfaceMuted,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: 'Chat', icon: Icon(Icons.chat_bubble_outline_rounded)),
-            Tab(text: 'Evolución', icon: Icon(Icons.local_florist_rounded)),
-            Tab(text: 'Miembros', icon: Icon(Icons.groups_rounded)),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFDFBF7), // Warm parchment cream
+            Color(0xFFF5EDE0), // Soft sepia beige
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildChatTab(),
-          _buildEvolutionTab(),
-          _buildMembersTab(),
-        ],
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppColors.onSurface),
+          title: Text(
+            widget.group.name,
+            style: const TextStyle(
+              color: AppColors.onSurface,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Inter',
+            ),
+          ),
+          bottom: TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: AppColors.onSurfaceMuted,
+            indicatorColor: AppColors.primary,
+            tabs: const [
+              Tab(text: 'Chat', icon: Icon(Icons.chat_bubble_outline_rounded)),
+              Tab(text: 'Evolución', icon: Icon(Icons.local_florist_rounded)),
+              Tab(text: 'Miembros', icon: Icon(Icons.groups_rounded)),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildChatTab(),
+            _buildEvolutionTab(),
+            _buildMembersTab(),
+          ],
+        ),
       ),
     );
   }
@@ -352,81 +374,122 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
     final membersAsync = ref.watch(groupMembersProvider(widget.group.conversationId));
     final currentUserId = ref.watch(authProvider).user?.id ?? '';
 
-    return Column(
-      children: [
-        Expanded(
-          child: messagesAsync.when(
-            data: (messages) {
-              if (messages.isEmpty) {
-                return const Center(
-                  child: Text(
-                    'No hay mensajes aún. ¡Comiencen a hablar!',
-                    style: TextStyle(color: AppColors.onSurfaceMuted),
-                  ),
-                );
-              }
-
-              // Mapear participantes para obtener avatar y nombre
-              final members = membersAsync.value ?? [];
-              final membersMap = {
-                for (final m in members) m['id'] as String: m
-              };
-
-              WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-
-              return ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: messages.length,
-                itemBuilder: (context, index) {
-                  final msg = messages[index] as MessageModel;
-                  final isMe = msg.senderId == currentUserId;
-                  final senderProfile = membersMap[msg.senderId];
-                  final senderName = senderProfile?['full_name'] as String? ?? 'Usuario';
-                  final senderAvatar = senderProfile?['avatar_url'] as String?;
-
-                  return MessageBubble(
-                    message: msg,
-                    conversationId: widget.group.conversationId,
-                    onWordTap: _showWordCard,
-                    senderName: isMe ? null : senderName,
-                    senderAvatar: isMe ? null : senderAvatar,
-                  );
-                },
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: AppColors.error))),
+    return Container(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          // Blob decorativo superior derecho (Melón suave)
+          Positioned(
+            top: -60,
+            right: -60,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFEADCC9).withValues(alpha: 0.35),
+              ),
+            ),
           ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AppColors.border)),
+          // Blob decorativo inferior izquierdo (Lavanda de la marca)
+          Positioned(
+            bottom: 120, // Por encima de la barra de entrada de texto
+            left: -80,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFDCD3FF).withValues(alpha: 0.25),
+              ),
+            ),
           ),
-          child: Row(
+          // Contenido principal
+          Column(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  style: const TextStyle(color: AppColors.onSurface),
-                  decoration: const InputDecoration(
-                    hintText: 'Enviar mensaje...',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                  onSubmitted: (_) => _sendMessage(),
+                child: messagesAsync.when(
+                  data: (messages) {
+                    if (messages.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No hay mensajes aún. ¡Comiencen a hablar!',
+                          style: TextStyle(color: AppColors.onSurfaceMuted),
+                        ),
+                      );
+                    }
+
+                    // Mapear participantes para obtener avatar y nombre
+                    final members = membersAsync.value ?? [];
+                    final membersMap = {
+                      for (final m in members) m['id'] as String: m
+                    };
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+                    return ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = messages[index] as MessageModel;
+                        final isMe = msg.senderId == currentUserId;
+                        final senderProfile = membersMap[msg.senderId];
+                        final senderName = senderProfile?['full_name'] as String? ?? 'Usuario';
+                        final senderAvatar = senderProfile?['avatar_url'] as String?;
+
+                        return MessageBubble(
+                          message: msg,
+                          conversationId: widget.group.conversationId,
+                          onWordTap: _showWordCard,
+                          senderName: isMe ? null : senderName,
+                          senderAvatar: isMe ? null : senderAvatar,
+                        );
+                      },
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: AppColors.error))),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.send_rounded, color: AppColors.primary),
-                onPressed: _sendMessage,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: Colors.transparent, // Transparente para ver el degradado detrás
+                  border: Border(top: BorderSide(color: AppColors.border, width: 0.8)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: TextField(
+                          controller: _messageController,
+                          style: const TextStyle(color: AppColors.onSurface),
+                          decoration: const InputDecoration(
+                            hintText: 'Enviar mensaje...',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.send_rounded, color: AppColors.primary),
+                      onPressed: _sendMessage,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
