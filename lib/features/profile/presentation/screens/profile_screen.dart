@@ -2055,7 +2055,7 @@ class _MiniWordCard extends StatelessWidget {
                 // Imagen
                 Center(
                   child: Container(
-                    height: 120,
+                    height: 190,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
