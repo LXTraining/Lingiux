@@ -687,6 +687,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                                           child: Container(
                                             width: 68,
                                             margin: const EdgeInsets.only(right: 10),
+                                            clipBehavior: Clip.antiAlias,
                                             decoration: BoxDecoration(
                                               borderRadius: BorderRadius.circular(14),
                                               border: Border.all(color: AppColors.border, width: 0.8),
@@ -694,40 +695,71 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                                                   ? DecorationImage(
                                                       image: NetworkImage(card.imageUrl),
                                                       fit: BoxFit.cover,
-                                                      colorFilter: ColorFilter.mode(
-                                                        Colors.black.withValues(alpha: 0.35),
-                                                        BlendMode.darken,
-                                                      ),
                                                     )
                                                   : null,
                                               color: card.imageUrl.isEmpty ? AppColors.surface : null,
                                             ),
-                                            child: Center(
-                                              child: Padding(
-                                                padding: const EdgeInsets.all(4.0),
-                                                child: Text(
-                                                  card.word,
-                                                  textAlign: TextAlign.center,
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    color: card.imageUrl.isNotEmpty ? Colors.white : AppColors.onSurface,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontFamily: 'Inter',
-                                                    shadows: card.imageUrl.isNotEmpty
-                                                        ? [
-                                                            const Shadow(
-                                                              color: Colors.black54,
-                                                              blurRadius: 3,
-                                                              offset: Offset(0, 1),
-                                                            )
-                                                          ]
-                                                        : null,
+                                            child: card.imageUrl.isNotEmpty
+                                                ? Stack(
+                                                    children: [
+                                                      Positioned(
+                                                        left: 0,
+                                                        right: 0,
+                                                        bottom: 0,
+                                                        child: Container(
+                                                          height: 22,
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.black.withOpacity(0.20),
+                                                            borderRadius: const BorderRadius.only(
+                                                              bottomLeft: Radius.circular(14),
+                                                              bottomRight: Radius.circular(14),
+                                                            ),
+                                                            border: Border(
+                                                              top: BorderSide(
+                                                                color: Colors.white.withOpacity(0.12),
+                                                                width: 0.5,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          child: Center(
+                                                            child: Padding(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                                              child: Text(
+                                                                card.word.toUpperCase(),
+                                                                textAlign: TextAlign.center,
+                                                                maxLines: 1,
+                                                                overflow: TextOverflow.ellipsis,
+                                                                style: const TextStyle(
+                                                                  color: Colors.white,
+                                                                  fontSize: 8,
+                                                                  fontWeight: FontWeight.w900,
+                                                                  letterSpacing: 0.2,
+                                                                  fontFamily: 'Georgia',
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  )
+                                                : Center(
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.all(4.0),
+                                                      child: Text(
+                                                        card.word,
+                                                        textAlign: TextAlign.center,
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(
+                                                          color: AppColors.onSurface,
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontFamily: 'Inter',
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              ),
-                                            ),
                                           ),
                                         );
                                       },

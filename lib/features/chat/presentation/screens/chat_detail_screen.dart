@@ -1222,7 +1222,6 @@ class MiniCardBase extends StatelessWidget {
                       end: Alignment.bottomCenter,
                     ),
                   ),
-                  padding: const EdgeInsets.all(12),
                   child: child,
                 ),
               ),
@@ -1258,7 +1257,7 @@ class WordMiniCardFront extends ConsumerWidget {
         background: [
           Positioned.fill(
             child: Opacity(
-              opacity: 0.70,
+              opacity: 1.0,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: CachedNetworkImage(
@@ -1272,31 +1271,44 @@ class WordMiniCardFront extends ConsumerWidget {
             ),
           ),
         ],
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: [
-            const Icon(
-              Icons.auto_stories_outlined,
-              color: Colors.white,
-              size: 22,
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.25),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.15),
-                  width: 0.5,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.20),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.white.withOpacity(0.12),
+                      width: 0.5,
+                    ),
+                  ),
                 ),
-              ),
-              child: const Text(
-                'Open',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Text(
+                      matchingCard.word.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.3,
+                        fontFamily: 'Georgia',
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1324,7 +1336,7 @@ class WordMiniCardFront extends ConsumerWidget {
             return [
               Positioned.fill(
                 child: Opacity(
-                  opacity: 0.70,
+                  opacity: 1.0,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: CachedNetworkImage(
@@ -1356,55 +1368,104 @@ class WordMiniCardFront extends ConsumerWidget {
           }
           final hasCard = fallbackCard != null;
 
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                hasCard ? Icons.auto_stories_outlined : Icons.add_circle_outline_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                word,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  height: 1.2,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black45,
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
+          if (hasCard) {
+            return Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.20),
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+                      border: Border(
+                        top: BorderSide(
+                          color: Colors.white.withOpacity(0.12),
+                          width: 0.5,
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: hasCard ? Colors.white.withOpacity(0.25) : Colors.white.withOpacity(0.35),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.15),
-                    width: 0.5,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text(
+                          word.toUpperCase(),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.3,
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                child: Text(
-                  hasCard ? 'Open' : '+ Crear',
+              ],
+            );
+          }
+
+          return Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  word,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    height: 1.2,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black45,
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.15),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: const Text(
+                    '+ Crear',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
         loading: () => const SizedBox(),
@@ -1438,92 +1499,13 @@ class WordMiniCardBack extends ConsumerWidget {
 
       return MiniCardBase(
         onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.g_translate_outlined,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(height: 6),
-            if (phonetic.isNotEmpty) ...[
-              Text(
-                phonetic,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  fontSize: 9,
-                  fontStyle: FontStyle.italic,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-            ],
-            Expanded(
-              child: Center(
-                child: SingleChildScrollView(
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: Text(
-                    definition,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black45,
-                          blurRadius: 4,
-                          offset: Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Icon(
-              Icons.flip_camera_android_outlined,
-              color: Colors.white70,
-              size: 14,
-            ),
-          ],
-        ),
-      );
-    }
-
-    final wordCardsAsync = ref.watch(wordCardsProvider);
-
-    return MiniCardBase(
-      onTap: onTap,
-      child: wordCardsAsync.when(
-        data: (wordList) {
-          WordCardModel? fallbackCard;
-          for (final w in wordList) {
-            if (w.word.toLowerCase() == word.toLowerCase() &&
-                (w.conversationId == null || w.conversationId!.isEmpty || w.conversationId == conversationId)) {
-              fallbackCard = w;
-              break;
-            }
-          }
-
-          final hasCard = fallbackCard != null;
-          final definition = hasCard
-              ? fallbackCard.definition
-              : 'Esta palabra no tiene tarjeta aún. ¡Toca aquí para crearla y memorizarla!';
-          final phonetic = hasCard ? fallbackCard.phonetic : '';
-
-          return Column(
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                hasCard ? Icons.g_translate_outlined : Icons.style_outlined,
+              const Icon(
+                Icons.g_translate_outlined,
                 color: Colors.white,
                 size: 20,
               ),
@@ -1575,6 +1557,91 @@ class WordMiniCardBack extends ConsumerWidget {
                 size: 14,
               ),
             ],
+          ),
+        ),
+      );
+    }
+
+    final wordCardsAsync = ref.watch(wordCardsProvider);
+
+    return MiniCardBase(
+      onTap: onTap,
+      child: wordCardsAsync.when(
+        data: (wordList) {
+          WordCardModel? fallbackCard;
+          for (final w in wordList) {
+            if (w.word.toLowerCase() == word.toLowerCase() &&
+                (w.conversationId == null || w.conversationId!.isEmpty || w.conversationId == conversationId)) {
+              fallbackCard = w;
+              break;
+            }
+          }
+
+          final hasCard = fallbackCard != null;
+          final definition = hasCard
+              ? fallbackCard.definition
+              : 'Esta palabra no tiene tarjeta aún. ¡Toca aquí para crearla y memorizarla!';
+          final phonetic = hasCard ? fallbackCard.phonetic : '';
+
+          return Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  hasCard ? Icons.g_translate_outlined : Icons.style_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(height: 6),
+                if (phonetic.isNotEmpty) ...[
+                  Text(
+                    phonetic,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 9,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Text(
+                        definition,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black45,
+                              blurRadius: 4,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Icon(
+                  Icons.flip_camera_android_outlined,
+                  color: Colors.white70,
+                  size: 14,
+                ),
+              ],
+            ),
           );
         },
         loading: () => const Center(
@@ -1793,7 +1860,7 @@ class _OverlayEntranceState extends State<OverlayEntrance>
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _backdropOpacityAnimation = Tween<double>(
       begin: 0.0,
-      end: 0.15,
+      end: 0.35,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _slideAnimation = Tween<double>(
       begin: widget.isBelow ? -8.0 : 8.0,
