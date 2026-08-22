@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/constants/app_colors.dart';
 import 'package:lingiux_app/features/vocabulary/presentation/providers/vocabulary_provider.dart';
+import '../../../home/presentation/providers/navigation_provider.dart';
 
 class CreateCardFormScreen extends ConsumerStatefulWidget {
   final Uint8List imageBytes;
@@ -181,6 +182,8 @@ class CreateCardFormScreen extends ConsumerStatefulWidget {
         }
       }
 
+      final conversationId = ref.read(pendingConversationIdProvider);
+
       // 3. Guardar la metadata en la tabla word_cards de Supabase
       await supabase.from('word_cards').insert({
         'user_id': supabase.auth.currentUser?.id,
@@ -193,7 +196,10 @@ class CreateCardFormScreen extends ConsumerStatefulWidget {
         'example_sentence': _exampleController.text.trim(),
         'audio_url': audioUrl,
         'created_at': DateTime.now().toIso8601String(),
+        'conversation_id': conversationId,
       });
+
+      ref.read(pendingConversationIdProvider.notifier).state = null;
       // 4. Invalidar el provider de Riverpod para refrescar las listas
       ref.invalidate(wordCardsProvider);
       ref.invalidate(userWordCardsProvider);
@@ -270,6 +276,38 @@ class CreateCardFormScreen extends ConsumerStatefulWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          if (ref.watch(pendingConversationIdProvider) != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5E9),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFF81C784), width: 0.8),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.lock_outline_rounded,
+                                    color: Color(0xFF2E7D32),
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Nota: Esta tarjeta será privada y local para tu conversación actual.',
+                                      style: TextStyle(
+                                        color: Color(0xFF2E7D32),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           // Preview de la imagen
                           Center(
                             child: Container(

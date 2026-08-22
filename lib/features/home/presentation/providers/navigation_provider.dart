@@ -5,6 +5,8 @@ final activeTabProvider = StateProvider<int>((ref) => 0);
 
 final pendingWordProvider = StateProvider<String?>((ref) => null);
 
+final pendingConversationIdProvider = StateProvider<String?>((ref) => null);
+
 final homeScaffoldKeyProvider = Provider<GlobalKey<ScaffoldState>>((ref) {
   return GlobalKey<ScaffoldState>();
 });

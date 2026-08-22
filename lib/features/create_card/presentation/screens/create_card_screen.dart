@@ -92,6 +92,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
       setState(() {
         _currentStep = -1;
       });
+      ref.read(pendingConversationIdProvider.notifier).state = null;
     }
   }
 
@@ -159,6 +160,8 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
         }
       }
 
+      final conversationId = ref.read(pendingConversationIdProvider);
+
       // 3. Guardar en word_cards con canvas_design
       await supabase.from('word_cards').insert({
         'user_id': supabase.auth.currentUser?.id,
@@ -171,12 +174,16 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
         'example_sentence': _exampleController.text.trim(),
         'audio_url': audioUrl,
         'created_at': DateTime.now().toIso8601String(),
+        'conversation_id': conversationId,
         'canvas_design': {
           'gradient_index': _selectedGradientIndex,
           'frame_type': _selectedFrameType,
           ...quizConfig,
         },
       });
+
+      // Limpiar el ID de conversación pendiente
+      ref.read(pendingConversationIdProvider.notifier).state = null;
 
       // 4. Invalidar proveedores Riverpod para refrescar listas
       ref.invalidate(wordCardsProvider);
@@ -235,6 +242,15 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
         });
         // Limpiamos el estado pendiente para no ciclar
         ref.read(pendingWordProvider.notifier).state = null;
+      }
+    });
+
+    // Escuchar si hay una conversación de chat pendiente para ir directo al creador local
+    ref.listen<String?>(pendingConversationIdProvider, (previous, next) {
+      if (next != null && next.trim().isNotEmpty) {
+        setState(() {
+          _currentStep = 0; // Ir directo a la creación de carta
+        });
       }
     });
 
@@ -584,6 +600,41 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  if (ref.watch(pendingConversationIdProvider) != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF81C784), width: 0.8),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.lock_outline_rounded,
+                              color: Color(0xFF2E7D32),
+                              size: 18,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Nota: Esta tarjeta será privada y local para tu conversación actual.',
+                                style: TextStyle(
+                                  color: Color(0xFF2E7D32),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   Expanded(
                     child: StepWordIdentity(
                       wordController: _wordController,

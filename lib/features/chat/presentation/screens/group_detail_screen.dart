@@ -15,6 +15,7 @@ import '../../../../features/profile/presentation/providers/added_people_provide
 import '../../../../features/vocabulary/domain/models/word_card_model.dart';
 import '../../../../features/vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../../features/vocabulary/presentation/screens/word_detail_screen.dart';
+import '../../../home/presentation/providers/navigation_provider.dart';
 
 // Provider para obtener los participantes de la conversación grupal
 final groupMembersProvider = FutureProvider.family.autoDispose<List<Map<String, dynamic>>, String>((ref, conversationId) async {
@@ -52,7 +53,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -86,7 +87,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
     if (cleanWord.length < 2) return;
 
     final wordList = ref.read(wordCardsProvider).value ?? [];
-    final matches = wordList.where((w) => w.word.toLowerCase() == cleanWord.toLowerCase()).toList();
+    // Obtener todas las cartas que coinciden con esta palabra (case-insensitive),
+    // excluyendo las cartas locales que pertenezcan a otros chats.
+    final matches = wordList.where((w) => 
+      w.word.toLowerCase() == cleanWord.toLowerCase() &&
+      (w.conversationId == null || w.conversationId!.isEmpty || w.conversationId == widget.group.conversationId)
+    ).toList();
 
     WordCardModel? selectedWordCard;
     if (matches.isNotEmpty) {
@@ -149,6 +155,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
           front: WordMiniCardFront(
             word: cleanWord,
             card: selectedWordCard,
+            conversationId: widget.group.conversationId,
             onTap: () {
               _dismissOverlay();
               Navigator.push(
@@ -186,6 +193,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
           back: WordMiniCardBack(
             word: cleanWord,
             card: selectedWordCard,
+            conversationId: widget.group.conversationId,
             onTap: () {
               _dismissOverlay();
               Navigator.push(
@@ -344,6 +352,20 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
               fontFamily: 'Inter',
             ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.style_outlined),
+              tooltip: 'Crear carta local',
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                // Registrar que la creación de carta provino de esta conversación de grupo
+                ref.read(pendingConversationIdProvider.notifier).state = widget.group.conversationId;
+                // Redirigir al creador de cartas (pestaña index 2)
+                ref.read(activeTabProvider.notifier).state = 2;
+                Navigator.popUntil(context, (route) => route.isFirst);
+              },
+            ),
+          ],
           bottom: TabBar(
             controller: _tabController,
             labelColor: AppColors.primary,
@@ -353,6 +375,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
               Tab(text: 'Chat', icon: Icon(Icons.chat_bubble_outline_rounded)),
               Tab(text: 'Evolución', icon: Icon(Icons.local_florist_rounded)),
               Tab(text: 'Miembros', icon: Icon(Icons.groups_rounded)),
+              Tab(text: 'Cartas', icon: Icon(Icons.style_outlined)),
             ],
           ),
         ),
@@ -362,6 +385,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
             _buildChatTab(),
             _buildEvolutionTab(),
             _buildMembersTab(),
+            _buildLocalCardsTab(),
           ],
         ),
       ),
@@ -696,6 +720,112 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> with Sing
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLocalCardsTab() {
+    final wordCardsAsync = ref.watch(wordCardsProvider);
+    return wordCardsAsync.when(
+      data: (wordList) {
+        final localCards = wordList.where((w) => w.conversationId == widget.group.conversationId).toList();
+        
+        if (localCards.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.style_outlined,
+                  color: AppColors.onSurfaceMuted.withValues(alpha: 0.4),
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No hay cartas locales creadas en este grupo.',
+                  style: TextStyle(
+                    color: AppColors.onSurfaceMuted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          physics: const BouncingScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.72,
+          ),
+          itemCount: localCards.length,
+          itemBuilder: (context, index) {
+            final card = localCards[index];
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WordDetailScreen(
+                      selectedWord: card.word,
+                      cardId: card.id,
+                      conversationId: widget.group.conversationId,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border, width: 0.8),
+                  image: card.imageUrl.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(card.imageUrl),
+                          fit: BoxFit.cover,
+                          colorFilter: ColorFilter.mode(
+                            Colors.black.withValues(alpha: 0.3),
+                            BlendMode.darken,
+                          ),
+                        )
+                      : null,
+                  color: card.imageUrl.isEmpty ? AppColors.surface : null,
+                ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      card.word,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: card.imageUrl.isNotEmpty ? Colors.white : AppColors.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Inter',
+                        shadows: card.imageUrl.isNotEmpty
+                            ? [
+                                const Shadow(
+                                  color: Colors.black54,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1),
+                                )
+                              ]
+                            : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      error: (err, __) => Center(child: Text('Error al cargar cartas locales: $err')),
     );
   }
 }

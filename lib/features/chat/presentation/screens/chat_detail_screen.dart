@@ -15,6 +15,7 @@ import '../../../../../core/services/audio_service.dart';
 import '../../../vocabulary/domain/models/word_card_model.dart';
 import '../../../vocabulary/presentation/providers/vocabulary_provider.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
+import '../../../home/presentation/providers/navigation_provider.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final ChatEntity chat;
@@ -61,9 +62,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
     final wordList = ref.read(wordCardsProvider).value ?? [];
     
-    // Obtener todas las cartas que coinciden con esta palabra (case-insensitive)
-    final matches = wordList.where((w) => w.word.toLowerCase() == cleanWord.toLowerCase()).toList();
-    
+    // Obtener todas las cartas que coinciden con esta palabra (case-insensitive),
+    // excluyendo las cartas locales que pertenezcan a otros chats.
+    final matches = wordList.where((w) => 
+      w.word.toLowerCase() == cleanWord.toLowerCase() &&
+      (w.conversationId == null || w.conversationId!.isEmpty || w.conversationId == widget.chat.id)
+    ).toList();
+
     WordCardModel? selectedWordCard;
     if (matches.isNotEmpty) {
       final cacheKey = "${messageId}_${cleanWord.toLowerCase()}";
@@ -131,6 +136,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           front: WordMiniCardFront(
             word: cleanWord,
             card: selectedWordCard,
+            conversationId: widget.chat.id,
             onTap: () {
               _dismissOverlay();
               Navigator.push(
@@ -168,6 +174,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           back: WordMiniCardBack(
             word: cleanWord,
             card: selectedWordCard,
+            conversationId: widget.chat.id,
             onTap: () {
               _dismissOverlay();
               Navigator.push(
@@ -317,7 +324,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 ),
               ),
             ),
-            IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
+            IconButton(
+              icon: const Icon(Icons.style_outlined),
+              tooltip: 'Crear carta local',
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                // Registrar que la creación de carta provino de esta conversación
+                ref.read(pendingConversationIdProvider.notifier).state = widget.chat.id;
+                // Redirigir al creador de cartas (pestaña index 2)
+                ref.read(activeTabProvider.notifier).state = 2;
+                Navigator.popUntil(context, (route) => route.isFirst);
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.info_outline_rounded),
               onPressed: () {
@@ -563,6 +581,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 ),
               ),
               const SizedBox(height: 48),
+              // Cartas Locales de este Chat
+              _buildLocalCardsSection(context, ref),
+              const SizedBox(height: 40),
               // Rompecabezas Compartido
               _ChatPuzzleWidget(conversationId: widget.chat.id),
               const SizedBox(height: 40),
@@ -598,6 +619,151 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       ),
     );
   }
+
+  Widget _buildLocalCardsSection(BuildContext context, WidgetRef ref) {
+    final wordCardsAsync = ref.watch(wordCardsProvider);
+    return wordCardsAsync.when(
+      data: (wordList) {
+        final localCards = wordList.where((w) => w.conversationId == widget.chat.id).toList();
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Cartas Locales de este Chat',
+                  style: TextStyle(
+                    color: AppColors.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${localCards.length}',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (localCards.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border, width: 0.8),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.style_outlined,
+                      color: AppColors.onSurfaceMuted.withValues(alpha: 0.4),
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'No hay cartas locales creadas aún.',
+                      style: TextStyle(
+                        color: AppColors.onSurfaceMuted,
+                        fontSize: 12,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: localCards.length,
+                  itemBuilder: (context, index) {
+                    final card = localCards[index];
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WordDetailScreen(
+                              selectedWord: card.word,
+                              cardId: card.id,
+                              conversationId: widget.chat.id,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: 90,
+                        margin: const EdgeInsets.only(right: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border, width: 0.8),
+                          image: card.imageUrl.isNotEmpty
+                              ? DecorationImage(
+                                  image: NetworkImage(card.imageUrl),
+                                  fit: BoxFit.cover,
+                                  colorFilter: ColorFilter.mode(
+                                    Colors.black.withValues(alpha: 0.3),
+                                    BlendMode.darken,
+                                  ),
+                                )
+                              : null,
+                          color: card.imageUrl.isEmpty ? AppColors.surface : null,
+                        ),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              card.word,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: card.imageUrl.isNotEmpty ? Colors.white : AppColors.onSurface,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Inter',
+                                shadows: card.imageUrl.isNotEmpty
+                                    ? [
+                                        const Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 4,
+                                          offset: Offset(0, 1),
+                                        )
+                                      ]
+                                    : null,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      error: (_, __) => const SizedBox(),
+    );
+  }
 }
 
 class _InputBar extends StatefulWidget {
@@ -618,7 +784,7 @@ class _InputBarState extends State<_InputBar> {
     super.initState();
     widget.controller.addListener(() {
       final hasText = widget.controller.text.trim().isNotEmpty;
-      if (hasText != _hasText) setState(() => _hasText = hasText);
+      if (hasText != _hasText && mounted) setState(() => _hasText = hasText);
     });
   }
 
@@ -1219,11 +1385,13 @@ class WordMiniCardFront extends ConsumerWidget {
   final String word;
   final WordCardModel? card;
   final VoidCallback onTap;
+  final String? conversationId;
 
   const WordMiniCardFront({
     required this.word,
     this.card,
     required this.onTap,
+    this.conversationId,
     super.key,
   });
 
@@ -1292,7 +1460,8 @@ class WordMiniCardFront extends ConsumerWidget {
         data: (wordList) {
           WordCardModel? fallbackCard;
           for (final w in wordList) {
-            if (w.word.toLowerCase() == word.toLowerCase()) {
+            if (w.word.toLowerCase() == word.toLowerCase() &&
+                (w.conversationId == null || w.conversationId!.isEmpty || w.conversationId == conversationId)) {
               fallbackCard = w;
               break;
             }
@@ -1324,7 +1493,15 @@ class WordMiniCardFront extends ConsumerWidget {
       ),
       child: wordCardsAsync.when(
         data: (wordList) {
-          final hasCard = wordList.any((w) => w.word.toLowerCase() == word.toLowerCase());
+          WordCardModel? fallbackCard;
+          for (final w in wordList) {
+            if (w.word.toLowerCase() == word.toLowerCase() &&
+                (w.conversationId == null || w.conversationId!.isEmpty || w.conversationId == conversationId)) {
+              fallbackCard = w;
+              break;
+            }
+          }
+          final hasCard = fallbackCard != null;
 
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1388,11 +1565,13 @@ class WordMiniCardBack extends ConsumerWidget {
   final String word;
   final WordCardModel? card;
   final VoidCallback onTap;
+  final String? conversationId;
 
   const WordMiniCardBack({
     required this.word,
     this.card,
     required this.onTap,
+    this.conversationId,
     super.key,
   });
 
@@ -1474,7 +1653,8 @@ class WordMiniCardBack extends ConsumerWidget {
         data: (wordList) {
           WordCardModel? fallbackCard;
           for (final w in wordList) {
-            if (w.word.toLowerCase() == word.toLowerCase()) {
+            if (w.word.toLowerCase() == word.toLowerCase() &&
+                (w.conversationId == null || w.conversationId!.isEmpty || w.conversationId == conversationId)) {
               fallbackCard = w;
               break;
             }

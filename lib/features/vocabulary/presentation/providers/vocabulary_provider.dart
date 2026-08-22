@@ -32,6 +32,7 @@ final userWordCardsFamilyProvider = FutureProvider.family.autoDispose<List<WordC
         
     final cards = (response as List<dynamic>)
         .map((json) => WordCardModel.fromJson(json as Map<String, dynamic>))
+        .where((card) => card.conversationId == null || card.conversationId!.isEmpty)
         .toList();
     return cards;
   } catch (e) {
@@ -72,5 +73,8 @@ final correctWordCardsProvider = FutureProvider.autoDispose<List<WordCardModel>>
   final cards = await ref.watch(wordCardsProvider.future);
   final resolved = await ref.watch(resolvedCardsProvider.future);
   final resolvedCardIds = resolved.map((r) => r['card_id'] as String).toSet();
-  return cards.where((card) => resolvedCardIds.contains(card.id)).toList();
+  return cards
+      .where((card) => resolvedCardIds.contains(card.id))
+      .where((card) => card.conversationId == null || card.conversationId!.isEmpty)
+      .toList();
 });

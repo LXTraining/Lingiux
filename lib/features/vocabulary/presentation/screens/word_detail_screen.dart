@@ -154,7 +154,15 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
             ],
           ),
         ),
-        data: (wordCards) {
+        data: (rawWordCards) {
+          // Filtrar para mantener solo las cartas globales y las de la conversación actual.
+          // Cualquier carta local que pertenezca a otra conversación debe excluirse por seguridad.
+          final wordCards = rawWordCards.where((w) =>
+            w.conversationId == null ||
+            w.conversationId!.isEmpty ||
+            w.conversationId == widget.conversationId
+          ).toList();
+
           if (wordCards.isEmpty) {
             return const Center(
               child: Text(
@@ -806,6 +814,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
                       onPressed: () {
                         HapticFeedback.mediumImpact();
                         ref.read(pendingWordProvider.notifier).state = widget.wordCard.word;
+                        ref.read(pendingConversationIdProvider.notifier).state = widget.conversationId;
                         ref.read(activeTabProvider.notifier).state = 2;
                         Navigator.popUntil(context, (route) => route.isFirst);
                       },

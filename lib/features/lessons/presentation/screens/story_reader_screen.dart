@@ -37,6 +37,10 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
   // Variables para la simulación del Karaoke por aproximación (Fallback)
   Timer? _fallbackTimer;
 
+  // Variables para la calibración de sincronización manual
+  bool _showCalibrationSlider = false;
+  double _highlightCalibration = 1.0;
+
   @override
   void initState() {
     super.initState();
@@ -55,40 +59,15 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
   void _initTts() {
     _flutterTts.setStartHandler(() {
       _fallbackTimer?.cancel();
-      
-      // Encontrar la primera palabra para marcarla justo cuando inicia el audio real
-      int firstWordIdx = -1;
-      for (int i = 0; i < _tokens.length; i++) {
-        if (_tokens[i].isWord) {
-          firstWordIdx = i;
-          break;
-        }
-      }
-
-      setState(() {
-        _isPlaying = true;
-        _currentWordIndex = firstWordIdx;
-      });
-
-      // Arrancar predicción inmediata para evitar lag.
-      // Si la plataforma soporta eventos nativos, estos corregirán y sincronizarán la predicción sobre la marcha.
       _startFallbackTimer();
     });
 
     _flutterTts.setCompletionHandler(() {
-      _fallbackTimer?.cancel();
-      setState(() {
-        _isPlaying = false;
-        _currentWordIndex = -1;
-      });
+      _stop();
     });
 
     _flutterTts.setErrorHandler((msg) {
-      _fallbackTimer?.cancel();
-      setState(() {
-        _isPlaying = false;
-        _currentWordIndex = -1;
-      });
+      _stop();
     });
 
     // Cambios de progreso de lectura (iluminar palabra)
@@ -126,8 +105,6 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
         setState(() {
           _currentWordIndex = activeIndex;
         });
-        // Sincronizar el temporizador de predicción con la posición real reportada
-        _scheduleNextWordFallback();
       }
     });
   }
@@ -145,7 +122,6 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
     for (final match in matches) {
       final start = cleanedBuffer.length;
       if (match.group(1) != null) {
-        // Palabra etiquetada gramaticalmente
         final tag = match.group(1);
         final word = match.group(2)!;
         cleanedBuffer.write(word);
@@ -169,7 +145,6 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
           endOffset: cleanedBuffer.length,
         ));
       } else if (match.group(3) != null) {
-        // Palabra normal
         final word = match.group(3)!;
         cleanedBuffer.write(word);
         tokens.add(StoryToken(
@@ -180,7 +155,6 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
           endOffset: cleanedBuffer.length,
         ));
       } else {
-        // Signo o Espacio
         final other = match.group(0)!;
         cleanedBuffer.write(other);
         tokens.add(StoryToken(
@@ -224,9 +198,21 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
       
       _fallbackTimer?.cancel();
 
-      // No establecemos _isPlaying ni _currentWordIndex aquí. Esperamos a que setStartHandler
-      // sea disparado por el sistema operativo cuando el audio empiece a sonar realmente,
-      // eliminando por completo cualquier desfase o lag percibido.
+      int firstWordIdx = -1;
+      for (int i = 0; i < _tokens.length; i++) {
+        if (_tokens[i].isWord) {
+          firstWordIdx = i;
+          break;
+        }
+      }
+
+      setState(() {
+        _isPlaying = true;
+        _currentWordIndex = firstWordIdx;
+      });
+
+      _startFallbackTimer();
+
       await _flutterTts.speak(_cleanedText);
     }
   }
@@ -244,7 +230,6 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
     _fallbackTimer?.cancel();
     if (!_isPlaying) return;
 
-    // Si aún no ha iniciado el resaltado, marcar la primera palabra
     if (_currentWordIndex == -1) {
       for (int i = 0; i < _tokens.length; i++) {
         if (_tokens[i].isWord) {
@@ -263,7 +248,6 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
     _fallbackTimer?.cancel();
     if (!_isPlaying || _currentWordIndex == -1) return;
 
-    // Encontrar el índice de la siguiente palabra
     int nextIndex = -1;
     for (int i = _currentWordIndex + 1; i < _tokens.length; i++) {
       if (_tokens[i].isWord) {
@@ -273,16 +257,24 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
     }
 
     if (nextIndex == -1) {
-      // Llegó al final del texto, detener
       _stop();
       return;
     }
 
     final currentWordText = _tokens[_currentWordIndex].text;
     
-    // Cálculo estimado de milisegundos por palabra basado en la longitud y el speech rate de flutter_tts.
-    // 0.5 es la velocidad media de referencia.
-    final wordDurationMs = ((currentWordText.length * 95) / (_speechRate / 0.5)).clamp(220.0, 1600.0).toInt();
+    double pauseDelayMs = 0;
+    for (int i = _currentWordIndex + 1; i < nextIndex; i++) {
+      final tokenText = _tokens[i].text;
+      if (tokenText.contains('.') || tokenText.contains('?') || tokenText.contains('!')) {
+        pauseDelayMs += 350.0;
+      } else if (tokenText.contains(',') || tokenText.contains(';') || tokenText.contains(':')) {
+        pauseDelayMs += 150.0;
+      }
+    }
+    
+    // Aplicamos _highlightCalibration para permitir al usuario calibrar el resaltado
+    final wordDurationMs = (((currentWordText.length * 60) / (_speechRate / 0.5) / _highlightCalibration).clamp(160.0, 1300.0) + pauseDelayMs).toInt();
 
     _fallbackTimer = Timer(Duration(milliseconds: wordDurationMs), () {
       if (mounted && _isPlaying) {
@@ -535,6 +527,100 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
                 ),
               ),
 
+              // Panel de Calibración de Sincronización
+              if (_showCalibrationSlider)
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 96,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: activeTheme.isDark
+                          ? const Color(0xFF1E293B).withValues(alpha: 0.95)
+                          : Colors.white.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: activeTheme.isDark
+                            ? Colors.white.withValues(alpha: 0.15)
+                            : AppColors.border.withValues(alpha: 0.8),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: activeTheme.isDark ? 0.3 : 0.06),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Ajuste de Sincronización del Subrayado',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: activeTheme.textColor.withValues(alpha: 0.8),
+                              ),
+                            ),
+                            Text(
+                              '${(_highlightCalibration * 100).toInt()}%',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF7C3AED),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Icon(Icons.arrow_back_ios_new_rounded, size: 10, color: activeTheme.textColor.withValues(alpha: 0.5)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Subrayado lento',
+                              style: TextStyle(fontSize: 9, color: activeTheme.textColor.withValues(alpha: 0.5)),
+                            ),
+                            Expanded(
+                              child: SliderTheme(
+                                data: SliderThemeData(
+                                  trackHeight: 3,
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  activeTrackColor: const Color(0xFF7C3AED),
+                                  inactiveTrackColor: activeTheme.textColor.withValues(alpha: 0.15),
+                                  thumbColor: const Color(0xFF7C3AED),
+                                ),
+                                child: Slider(
+                                  value: _highlightCalibration,
+                                  min: 0.5,
+                                  max: 2.0,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _highlightCalibration = val;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                            Text(
+                              'Subrayado rápido',
+                              style: TextStyle(fontSize: 9, color: activeTheme.textColor.withValues(alpha: 0.5)),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.arrow_forward_ios_rounded, size: 10, color: activeTheme.textColor.withValues(alpha: 0.5)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               // Reproductor de Audio Flotante
               Positioned(
                 left: 20,
@@ -657,6 +743,24 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
                               ),
                             ),
                           ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Botón Sintonizar / Calibrar Sincronización
+                        IconButton(
+                          icon: Icon(
+                            Icons.tune_rounded,
+                            color: _showCalibrationSlider
+                                ? const Color(0xFF7C3AED)
+                                : activeTheme.textColor.withValues(alpha: 0.6),
+                            size: 22,
+                          ),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            setState(() {
+                              _showCalibrationSlider = !_showCalibrationSlider;
+                            });
+                          },
                         ),
                       ],
                     ),
@@ -1379,4 +1483,11 @@ class _StoryExercisePopupState extends State<StoryExercisePopup> {
       ),
     );
   }
+}
+
+class StorySentence {
+  final String text;
+  final List<int> tokenIndices;
+
+  StorySentence({required this.text, required this.tokenIndices});
 }
