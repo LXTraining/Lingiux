@@ -6,12 +6,14 @@ class StepWordIdentity extends StatefulWidget {
   final TextEditingController wordController;
   final String selectedLanguage;
   final ValueChanged<String?> onLanguageChanged;
+  final String? conversationId;
 
   const StepWordIdentity({
     super.key,
     required this.wordController,
     required this.selectedLanguage,
     required this.onLanguageChanged,
+    this.conversationId,
   });
 
   @override
@@ -123,13 +125,13 @@ class _StepWordIdentityState extends State<StepWordIdentity> with SingleTickerPr
           const SizedBox(height: 20),
 
           // 1. TÍTULO: Palabra Clave Centrado con tipografía restaurada
-          const Center(
+          Center(
             child: Text(
-              'Palabra Clave',
-              style: TextStyle(
+              widget.conversationId != null ? 'Crear Palabra Local' : 'Palabra Clave',
+              style: const TextStyle(
                 color: AppColors.onSurface,
-                fontSize: 20, // Restaurado al tamaño de fuente anterior
-                fontWeight: FontWeight.bold, // Restaurado a negrita estándar
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
                 fontFamily: 'Inter',
               ),
             ),

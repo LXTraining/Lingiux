@@ -13,6 +13,7 @@ import '../../../lessons/presentation/screens/story_reader_screen.dart';
 import '../../../lessons/presentation/providers/stories_provider.dart';
 import '../../../lessons/domain/models/story_model.dart';
 import '../widgets/card_editor_widget.dart';
+import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
 
 class CreateCardScreen extends ConsumerStatefulWidget {
   final bool isActive;
@@ -89,10 +90,14 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
       });
       ref.read(isCardEditorActiveProvider.notifier).state = false;
     } else if (_currentStep == 0) {
+      final conversationId = ref.read(pendingConversationIdProvider);
       setState(() {
         _currentStep = -1;
       });
       ref.read(pendingConversationIdProvider.notifier).state = null;
+      if (conversationId != null) {
+        ref.read(activeTabProvider.notifier).state = 0;
+      }
     }
   }
 
@@ -233,6 +238,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final conversationId = ref.watch(pendingConversationIdProvider);
     // Escuchar si hay una palabra pendiente de precargar desde el chat
     ref.listen<String?>(pendingWordProvider, (previous, next) {
       if (next != null && next.trim().isNotEmpty) {
@@ -536,101 +542,213 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
             body: SafeArea(
               child: Column(
                 children: [
-                  const SizedBox(height: 16),
-                  // Progress Bar (Paso 1 de 2)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: _prevStep,
-                              child: const Icon(
-                                Icons.arrow_back_ios_rounded,
-                                color: AppColors.onSurfaceMuted,
-                                size: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'IDENTIDAD',
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                fontFamily: 'Inter',
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                            Text(
-                              'Paso 1 de 2',
-                              style: TextStyle(
-                                color: AppColors.onSurfaceMuted,
-                                fontSize: 11,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Stack(
-                          children: [
-                            Container(
-                              height: 8,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: AppColors.border.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            Container(
-                              height: 8,
-                              width: MediaQuery.of(context).size.width * 0.88 * 0.5, // 50%
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  if (ref.watch(pendingConversationIdProvider) != null) ...[
+                  if (conversationId == null) ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF81C784), width: 0.8),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.lock_outline_rounded,
-                              color: Color(0xFF2E7D32),
-                              size: 18,
-                            ),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Nota: Esta tarjeta será privada y local para tu conversación actual.',
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: _prevStep,
+                                child: const Icon(
+                                  Icons.arrow_back_ios_rounded,
+                                  color: AppColors.onSurfaceMuted,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'IDENTIDAD',
                                 style: TextStyle(
-                                  color: Color(0xFF2E7D32),
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Inter',
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Paso 1 de 2',
+                                style: TextStyle(
+                                  color: AppColors.onSurfaceMuted,
+                                  fontSize: 11,
                                   fontFamily: 'Inter',
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Stack(
+                            children: [
+                              Container(
+                                height: 8,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: AppColors.border.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              Container(
+                                height: 8,
+                                width: MediaQuery.of(context).size.width * 0.88 * 0.5,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF815BF5), Color(0xFF5A45FF)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ] else ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: _prevStep,
+                                child: const Icon(
+                                  Icons.arrow_back_ios_rounded,
+                                  color: AppColors.onSurface,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Cartas en esta conversación',
+                                style: TextStyle(
+                                  color: AppColors.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Consumer(
+                            builder: (context, ref, child) {
+                              final wordCardsAsync = ref.watch(wordCardsProvider);
+                              return wordCardsAsync.when(
+                                data: (wordList) {
+                                  final localCards = wordList.where((w) => w.conversationId == conversationId).toList();
+                                  
+                                  if (localCards.isEmpty) {
+                                    return Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surface,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: AppColors.border, width: 0.8),
+                                      ),
+                                      child: const Text(
+                                        'No hay cartas creadas en este chat aún.',
+                                        style: TextStyle(
+                                          color: AppColors.onSurfaceMuted,
+                                          fontSize: 12,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  return SizedBox(
+                                    height: 100,
+                                    child: ListView.builder(
+                                      scrollDirection: Axis.horizontal,
+                                      physics: const BouncingScrollPhysics(),
+                                      itemCount: localCards.length,
+                                      itemBuilder: (context, index) {
+                                        final card = localCards[index];
+                                        return GestureDetector(
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => WordDetailScreen(
+                                                  selectedWord: card.word,
+                                                  cardId: card.id,
+                                                  conversationId: conversationId,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: Container(
+                                            width: 68,
+                                            margin: const EdgeInsets.only(right: 10),
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(14),
+                                              border: Border.all(color: AppColors.border, width: 0.8),
+                                              image: card.imageUrl.isNotEmpty
+                                                  ? DecorationImage(
+                                                      image: NetworkImage(card.imageUrl),
+                                                      fit: BoxFit.cover,
+                                                      colorFilter: ColorFilter.mode(
+                                                        Colors.black.withValues(alpha: 0.35),
+                                                        BlendMode.darken,
+                                                      ),
+                                                    )
+                                                  : null,
+                                              color: card.imageUrl.isEmpty ? AppColors.surface : null,
+                                            ),
+                                            child: Center(
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(4.0),
+                                                child: Text(
+                                                  card.word,
+                                                  textAlign: TextAlign.center,
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color: card.imageUrl.isNotEmpty ? Colors.white : AppColors.onSurface,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontFamily: 'Inter',
+                                                    shadows: card.imageUrl.isNotEmpty
+                                                        ? [
+                                                            const Shadow(
+                                                              color: Colors.black54,
+                                                              blurRadius: 3,
+                                                              offset: Offset(0, 1),
+                                                            )
+                                                          ]
+                                                        : null,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                                loading: () => const SizedBox(
+                                  height: 76,
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                                    ),
+                                  ),
+                                ),
+                                error: (_, __) => const SizedBox(),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -642,6 +760,7 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                       onLanguageChanged: (val) {
                         if (val != null) setState(() => _selectedLanguage = val);
                       },
+                      conversationId: conversationId,
                     ),
                   ),
                   // Button
