@@ -332,8 +332,11 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
 
     final arrowLeft = (wordCenter.dx - left).clamp(16.0, cardWidth - 16.0);
 
+    final overlayKey = GlobalKey<OverlayEntranceState>();
+
     _overlayEntry = OverlayEntry(
       builder: (_) => OverlayEntrance(
+        key: overlayKey,
         left: left,
         top: top,
         isBelow: isBelow,
@@ -347,7 +350,13 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
             allCards: wordList,
             isBelow: isBelow,
             arrowLeft: arrowLeft,
-            onDismiss: _dismissOverlay,
+            onDismiss: () {
+              if (overlayKey.currentState != null) {
+                overlayKey.currentState!.handleDismiss();
+              } else {
+                _dismissOverlay();
+              }
+            },
             audioService: ref.read(audioServiceProvider),
           ),
         ),
@@ -470,13 +479,28 @@ class _StoryReaderScreenState extends ConsumerState<StoryReaderScreen> {
                         );
                       }
 
-                      // Resolver si existe tarjeta para esta palabra
-                      final cleanText = token.text.toLowerCase().trim();
+                      // Resolver si existe tarjeta asociada a esta palabra
+                      final cleanText = token.text.replaceAll(RegExp(r"[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ']"), '').toLowerCase().trim();
                       WordCardModel? matchedCard;
-                      for (final card in userCards) {
-                        if (card.word.toLowerCase().trim() == cleanText) {
-                          matchedCard = card;
-                          break;
+
+                      final Map<String, dynamic> wordExercises = Map<String, dynamic>.from(widget.story.metadata['word_exercises'] ?? {});
+                      if (wordExercises.isNotEmpty) {
+                        final associatedCardId = wordExercises[cleanText];
+                        if (associatedCardId != null) {
+                          for (final card in userCards) {
+                            if (card.id == associatedCardId) {
+                              matchedCard = card;
+                              break;
+                            }
+                          }
+                        }
+                      } else {
+                        // Fallback de retrocompatibilidad automática
+                        for (final card in userCards) {
+                          if (card.word.toLowerCase().trim() == cleanText) {
+                            matchedCard = card;
+                            break;
+                          }
                         }
                       }
 
@@ -833,10 +857,11 @@ class _StoryWordWidgetState extends State<_StoryWordWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final hasCard = widget.matchedCard != null;
     return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTapUp: (_) {
+      onTapDown: hasCard ? (_) => setState(() => _isPressed = true) : null,
+      onTapCancel: hasCard ? () => setState(() => _isPressed = false) : null,
+      onTapUp: hasCard ? (_) {
         setState(() => _isPressed = false);
         final RenderBox box = context.findRenderObject() as RenderBox;
         final Offset globalPosition = box.localToGlobal(Offset.zero);
@@ -845,7 +870,7 @@ class _StoryWordWidgetState extends State<_StoryWordWidget> {
           globalPosition.dy,
         );
         widget.onTap(widget.token.text, widget.matchedCard, centerPosition, box.size);
-      },
+      } : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: widget.isActiveHighlight
@@ -1020,6 +1045,18 @@ class _StoryExercisePopupState extends State<StoryExercisePopup> {
     return true;
   }
 
+  Future<void> _playFeedbackSound(bool isCorrect) async {
+    final player = AudioPlayer();
+    try {
+      final source = isCorrect ? 'sounds/correct.mp3' : 'sounds/incorrect.wav';
+      await player.play(AssetSource(source));
+      player.onPlayerComplete.first.then((_) => player.dispose());
+    } catch (e) {
+      debugPrint('Error playing feedback sound: $e');
+      player.dispose();
+    }
+  }
+
   void _checkAcomodarState() {
     final cleanSentence = _exampleSentence;
     final expectedWords = cleanSentence
@@ -1036,48 +1073,34 @@ class _StoryExercisePopupState extends State<StoryExercisePopup> {
         _isCorrect = correct;
       });
 
+      _playFeedbackSound(correct);
       if (correct) {
-        widget.audioService.playFlip(); // Exito
         HapticFeedback.heavyImpact();
-        Future.delayed(const Duration(milliseconds: 1600), () {
-          if (mounted) {
-            widget.onDismiss();
-          }
-        });
       } else {
-        widget.audioService.playTap(); // Fallo
         HapticFeedback.vibrate();
-        Future.delayed(const Duration(milliseconds: 1600), () {
-          if (mounted) {
-            setState(() {
-              _initializeQuiz();
-            });
-          }
-        });
       }
-    }
-  }
 
-  void _onOptionSelected(bool isCorrect) {
-    if (isCorrect) {
-      widget.audioService.playFlip();
-      HapticFeedback.heavyImpact();
-      Future.delayed(const Duration(milliseconds: 1600), () {
+      Future.delayed(const Duration(milliseconds: 200), () {
         if (mounted) {
           widget.onDismiss();
         }
       });
-    } else {
-      widget.audioService.playTap();
-      HapticFeedback.vibrate();
-      Future.delayed(const Duration(milliseconds: 1600), () {
-        if (mounted) {
-          setState(() {
-            _initializeQuiz();
-          });
-        }
-      });
     }
+  }
+
+  void _onOptionSelected(bool isCorrect) {
+    _playFeedbackSound(isCorrect);
+    if (isCorrect) {
+      HapticFeedback.heavyImpact();
+    } else {
+      HapticFeedback.vibrate();
+    }
+
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        widget.onDismiss();
+      }
+    });
   }
 
   void _onPreguntaSelected(int index) {

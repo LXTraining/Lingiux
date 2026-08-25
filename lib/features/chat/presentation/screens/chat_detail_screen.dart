@@ -1820,6 +1820,7 @@ class OverlayEntrance extends StatefulWidget {
   final GestureDragEndCallback? onHorizontalDragEnd;
 
   const OverlayEntrance({
+    super.key,
     required this.child,
     required this.isBelow,
     required this.left,
@@ -1830,10 +1831,10 @@ class OverlayEntrance extends StatefulWidget {
   });
 
   @override
-  State<OverlayEntrance> createState() => _OverlayEntranceState();
+  State<OverlayEntrance> createState() => OverlayEntranceState();
 }
 
-class _OverlayEntranceState extends State<OverlayEntrance>
+class OverlayEntranceState extends State<OverlayEntrance>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -1869,7 +1870,7 @@ class _OverlayEntranceState extends State<OverlayEntrance>
     _controller.forward();
   }
 
-  void _handleDismiss() {
+  void handleDismiss() {
     if (_isDismissing) return;
     setState(() {
       _isDismissing = true;
@@ -1888,7 +1889,7 @@ class _OverlayEntranceState extends State<OverlayEntrance>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: _handleDismiss,
+      onTap: handleDismiss,
       behavior: HitTestBehavior.translucent,
       onHorizontalDragEnd: widget.onHorizontalDragEnd,
       child: Stack(

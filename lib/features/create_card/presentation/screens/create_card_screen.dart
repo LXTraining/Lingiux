@@ -12,8 +12,9 @@ import '../../../lessons/presentation/screens/story_editor_screen.dart';
 import '../../../lessons/presentation/screens/story_reader_screen.dart';
 import '../../../lessons/presentation/providers/stories_provider.dart';
 import '../../../lessons/domain/models/story_model.dart';
-import '../widgets/card_editor_widget.dart';
 import '../../../vocabulary/presentation/screens/word_detail_screen.dart';
+import '../widgets/card_editor_widget.dart';
+import '../widgets/three_d_horizontal_carousel.dart';
 
 class CreateCardScreen extends ConsumerStatefulWidget {
   final bool isActive;
@@ -377,61 +378,29 @@ class _CreateCardScreenState extends ConsumerState<CreateCardScreen> {
                     ),
                     const SizedBox(height: 24),
                     
-                    // Fila superior de recuadros horizontales distribuidos uniformemente
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSelectionCard(
-                            context: context,
-                            title: 'Carta',
-                            subtitle: 'VOCABULARIO',
-                            icon: Icons.auto_awesome_motion_rounded,
-                            gradient: const [Color(0xFF815BF5), Color(0xFF5A45FF)],
-                            onTap: () {
-                              setState(() {
-                                _currentStep = 0;
-                              });
-                            },
+                    // Carrusel Horizontal 3D de opciones de creación
+                    ThreeDHorizontalCarousel(
+                      onCreateCard: () {
+                        setState(() {
+                          _currentStep = 0;
+                        });
+                      },
+                      onCreateLesson: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CreateLessonWizardScreen(),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildSelectionCard(
-                            context: context,
-                            title: 'Lección',
-                            subtitle: 'CAMINOS',
-                            icon: Icons.map_rounded,
-                            gradient: const [Color(0xFFFF6B8B), Color(0xFFFF8E53)],
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const CreateLessonWizardScreen(),
-                                ),
-                              );
-                            },
+                        );
+                      },
+                      onCreateStory: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const StoryEditorScreen(),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildSelectionCard(
-                            context: context,
-                            title: 'Relato',
-                            subtitle: 'LECTURAS',
-                            icon: Icons.auto_stories_rounded,
-                            gradient: const [Color(0xFF4FA4F4), Color(0xFF4CD9A3)],
-                            isFuture: false,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const StoryEditorScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
                     
                     const SizedBox(height: 32),
